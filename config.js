@@ -3,6 +3,6 @@
 // The anon key is meant to be public: row-level security in schema.sql is what keeps
 // each person's kingdom private. Never put the service_role key in this file.
 window.SAVE_ME_CONFIG = {
-  url: "YOUR_SUPABASE_PROJECT_URL",      // looks like https://abcdefghijkl.supabase.co
-  anonKey: "YOUR_SUPABASE_ANON_PUBLIC_KEY" // starts with eyJ... (anon) or sb_publishable_...
+  url: "https://lborzxlpabsypkarpwqd.supabase.co",
+  anonKey: "sb_publishable_jou7fOgAsYNGGXrCMzQMZg_LlxMbbwD"
 };
