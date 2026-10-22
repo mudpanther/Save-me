@@ -341,6 +341,10 @@ const BUILD=[
  {at:15000,id:"light",name:"Lighthouse & War Fleet",d:"A beam sweeps the lake. Warships anchor."},
  {at:20000,id:"citadel",name:"Floating Citadel",d:"A fortress that rules from the sky."},
  {at:150000,id:"palace",name:"Golden Palace",d:"Gold domes crown every spire."},
+ {at:300000,id:"spire",name:"Sunspire Wings",d:"Two golden towers rise beside the palace."},
+ {at:500000,id:"crystal",name:"Crystal Spires",d:"Spires of living crystal hum with light."},
+ {at:750000,id:"empire",name:"Empire Seat",d:"Banners of every realm hang from the walls."},
+ {at:1000000,id:"legend",name:"Mythic Throne",d:"A golden throne above the clouds. You built a legend."},
 ];
 const CRE=[
  {id:"dragon",species:"Emberwing Dragon",type:"drake",egg:500,stages:[
@@ -1020,6 +1024,19 @@ function manor(cx,t){
   R(cx-2,B-7,4,7,"#2a1c12");
   banner(cx,B-h-17,t,"#e8b64f");
 }
+function sunspire(cx){
+  for(const dx of [-44,36]){bricks(cx+dx,B-44,8,44,"#6b5a3a","#544530","#8a7550");cone(cx+dx+4,B-45,11,12,"#c9a24a","#a27a30",true)}
+}
+function crystal(cx,t){
+  for(const dx of [-30,26]){cone(cx+dx,B-50,9,18,"#5fd0e6","#3a9fc0",false);R(cx+dx-1,B-40,2,6,"#c9f6ff")}
+}
+function empireBanners(cx,t){for(let X=cx-50;X<=cx+50;X+=12)banner(X,B-36,t,"#a23b3b")}
+function legend(cx,t){
+  const pulse=reduce?0:Math.sin(t/500);
+  b.fillStyle="rgba(232,182,79,.045)";circ(b,cx,B-62,26+Math.round(pulse*2));
+  R(cx-2,B-96,5,5,"#ffe08a");R(cx-1,B-95,3,3,"#fff");
+  if(!reduce&&Math.random()<.04)emit(cx+(Math.random()-.5)*20,B-96,(Math.random()-.5)*.1,-.05,60,"#ffe08a");
+}
 function drawKeep(cx,t){
   const castle=has("castle"),palace=has("palace");
   const w=castle?36:30,h=castle?40:34,x0=cx-w/2,y0=B-h;
@@ -1068,6 +1085,10 @@ function frame(t){
     const pulse=reduce?0:Math.sin(t/300);b.fillStyle="rgba(159,231,255,.15)";circ(b,mx,B-66,6+Math.round(pulse));R(mx-2,B-68,5,5,"#9fe7ff");R(mx-1,B-67,2,2,"#ffffff");
     if(!reduce&&Math.random()<.12)emit(mx+(Math.random()-.5)*6,B-66,(Math.random()-.5)*.2,(Math.random()-.5)*.2,60,"#9fe7ff")}
   if(has("keep"))drawKeep(cx,t);
+  if(has("spire"))sunspire(cx);
+  if(has("crystal"))crystal(cx,t);
+  if(has("empire"))empireBanners(cx,t);
+  if(has("legend"))legend(cx,t);
   else if(has("manor"))manor(cx,t);
   else if(has("stonehouse"))stonehouse(cx,t);
   else hut(cx,t);
