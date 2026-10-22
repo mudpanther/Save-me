@@ -139,6 +139,30 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .authmsg{font-size:.92rem;color:var(--ward);margin:0}
 .authmsg.bad{color:var(--ember)}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:.85rem}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.fgrid{grid-template-columns:1fr}}
+.lbl{font-family:var(--pixel);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.inline input{flex:1;min-width:0;background:var(--night);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;padding:9px 12px}
+.inline input:focus{outline:none;border-color:var(--gold)}
+.inline code{font-family:var(--pixel);font-size:1.3rem;letter-spacing:.14em;color:var(--gold);background:var(--night);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.sub-h{font-family:var(--display);font-weight:500;font-size:1.25rem;margin:4px 0 0}
+#friendMsg{margin:0}
+.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.board li{background:var(--panel-2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.board li.me{outline:1px solid var(--gold)}
+.bhead{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:baseline}
+.rank{font-family:var(--pixel);color:var(--muted)}
+.bname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.bscore{font-family:var(--pixel);color:var(--gold);font-variant-numeric:tabular-nums}
+.bsub{font-size:.85rem;color:var(--muted)}
+.board .link{align-self:flex-start}
+.traits span.pill{background:transparent}
+.traits span.pill.r-common{color:var(--common)}
+.traits span.pill.r-rare{color:var(--rare)}
+.traits span.pill.r-epic{color:var(--epic)}
+.traits span.pill.r-legendary{color:var(--legendary)}
+.traits span.pill.r-mythic{background:linear-gradient(90deg,#ff7ad9,#8fd3ff,#ffe27a,#ff7ad9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;border-color:var(--mythic)}
 </style>
 </head>
 <body>
@@ -199,6 +223,28 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
       <button class="link" id="roadToggle">Show the full road</button>
     </section>
   </div>
+
+  <section class="panel" id="friendsPanel">
+    <h2>Friends</h2>
+    <div class="fgrid">
+      <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <span class="lbl">Your name</span>
+        <div class="inline"><input type="text" id="myName" maxlength="20" autocomplete="nickname" aria-label="Your name"><button type="button" id="saveName">Save</button></div>
+        <span class="lbl">Your friend code</span>
+        <div class="inline"><code id="myCode">--------</code><button type="button" id="copyCode">Copy</button></div>
+        <p class="hint">Share this code. A friend types it in to add you.</p>
+      </div>
+      <form id="addFriend" style="display:flex;flex-direction:column;gap:8px">
+        <span class="lbl">Add a friend</span>
+        <div class="inline"><input type="text" id="friendCode" maxlength="8" placeholder="Their 8-character code" autocomplete="off" aria-label="Friend code"><button type="submit">Add</button></div>
+        <p class="hint">Friends see your name, creatures, rarities and streak. They never see your balance.</p>
+      </form>
+    </div>
+    <p class="err" id="friendMsg" hidden></p>
+    <h3 class="sub-h">Leaderboard</h3>
+    <p class="hint">Score = rarity points for each creature (Common 1, Rare 3, Epic 6, Legendary 10, Mythic 15) plus 2 per week of streak.</p>
+    <ol class="board" id="board"></ol>
+  </section>
 
   <section class="panel">
     <h2>Royal Ledger</h2>
@@ -356,17 +402,17 @@ async function pull(){
   cacheSave();
 }
 async function startSession(user){
-  uid=user.id;$("auth").hidden=true;$("who").textContent=user.email||"";
+  uid=user.id;myEmail=user.email||"";$("auth").hidden=true;$("who").textContent=user.email||"";
   const cached=cacheLoad();
   if(cached&&cached.seed){data=cached;if(!data.cre)data.cre={};loaded=true;invalidateSprites();render(true)}
   setSync("Syncing…");
-  try{await pull();loaded=true;render(true);setSync("Saved");flush()}
+  try{await pull();loaded=true;render(true);setSync("Saved");flush();loadFriends()}
   catch(err){
     if(cached&&cached.seed){setSync(navigator.onLine?"Couldn't reach the server. Showing your last save.":"Offline. Showing your last save.")}
     else setSync("Couldn't load your kingdom. Check your connection and reopen the app.");
   }
 }
-async function resync(){if(!sb||!uid)return;try{await flush();await pull();render(false)}catch(e){}}
+async function resync(){if(!sb||!uid)return;try{await flush();await pull();render(false);loadBoard()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resync()});
 addEventListener("online",resync);
 
@@ -414,6 +460,79 @@ async function boot(){
   if(session&&session.user)await startSession(session.user);
   else{$("auth").hidden=false;setSync("Signed out")}
 }
+
+/* ---------- friends & leaderboard ---------- */
+let myEmail="", myProfile={name:"",code:""}, fmT=null;
+function flashFriend(t,bad){const m=$("friendMsg");m.textContent=t;m.style.color=bad?"":"var(--good)";m.className=bad?"err":"";m.hidden=false;clearTimeout(fmT);fmT=setTimeout(()=>m.hidden=true,4000)}
+async function ensureProfile(email){
+  const {data:found,error}=await sb.from("profiles").select("name,friend_code").eq("user_id",uid).maybeSingle();
+  if(error)throw error;
+  const p=Array.isArray(found)?found[0]:found;
+  if(p&&p.friend_code){myProfile={name:p.name,code:p.friend_code};return}
+  const name=(email||"Player").split("@")[0].slice(0,20)||"Player";
+  const ins=await sb.from("profiles").insert({user_id:uid,name}).select("name,friend_code").single();
+  if(ins.error)throw ins.error;
+  const made=Array.isArray(ins.data)?ins.data[0]:ins.data;
+  myProfile={name:made.name,code:made.friend_code};
+}
+function renderMe(){$("myName").value=myProfile.name;$("myCode").textContent=myProfile.code||"--------"}
+async function loadFriends(){
+  try{await ensureProfile(myEmail);renderMe();await loadBoard()}
+  catch(e){flashFriend("Couldn't load your friends list. Try again in a moment.",true)}
+}
+async function loadBoard(){
+  const {data,error}=await sb.rpc("friend_board");
+  if(error){flashFriend("Couldn't load the leaderboard. Try again in a moment.",true);return}
+  renderBoard(data||[]);
+}
+function renderBoard(rows){
+  const ol=$("board");ol.innerHTML="";
+  if(rows.length<=1){const li=document.createElement("li");li.className="empty";li.textContent="Only you so far. Share your code so friends can join the board.";ol.appendChild(li)}
+  rows.forEach((r,i)=>{
+    const li=document.createElement("li");if(r.is_me)li.className="me";
+    const head=document.createElement("div");head.className="bhead";
+    head.innerHTML=`<span class="rank">${i+1}</span><span class="bname"></span><span class="bscore"></span>`;
+    head.querySelector(".bname").textContent=r.name+(r.is_me?" (you)":"");
+    head.querySelector(".bscore").textContent=r.score+" pts";
+    const sub=document.createElement("div");sub.className="bsub";
+    sub.textContent=`${r.streak} week${r.streak===1?"":"s"} streak`;
+    const pills=document.createElement("div");pills.className="traits";
+    const list=r.creatures||[];
+    if(!list.length){const s=document.createElement("span");s.textContent="No creatures yet";pills.appendChild(s)}
+    list.forEach(c=>{const s=document.createElement("span");s.className="pill r-"+c.r;
+      const sp=(CRE.find(x=>x.id===c.id)||{}).species||c.id;
+      s.textContent=sp+" · "+RAR_NAME[c.r];pills.appendChild(s)});
+    li.append(head,sub,pills);
+    if(!r.is_me){const rm=document.createElement("button");rm.type="button";rm.className="link";rm.textContent="Remove friend";
+      rm.addEventListener("click",()=>removeFriend(r.player_id,r.name));li.appendChild(rm)}
+    ol.appendChild(li);
+  });
+}
+async function removeFriend(id,name){
+  if(!confirm(`Remove ${name} from your friends?`))return;
+  const {error}=await sb.rpc("remove_friend",{p_friend:id});
+  if(error){flashFriend("Couldn't remove them. Try again.",true);return}
+  flashFriend(`Removed ${name}.`);loadBoard();
+}
+$("saveName").addEventListener("click",async()=>{
+  const name=$("myName").value.trim().slice(0,20);
+  if(!name){flashFriend("Pick a name first.",true);return}
+  const {error}=await sb.from("profiles").update({name}).eq("user_id",uid);
+  if(error){flashFriend("Couldn't save your name. Try again.",true);return}
+  myProfile.name=name;flashFriend("Name saved.");loadBoard();
+});
+$("copyCode").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(myProfile.code);flashFriend("Code copied.")}
+  catch(e){flashFriend("Select the code and copy it by hand.",true)}
+});
+$("addFriend").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const code=$("friendCode").value.trim().toUpperCase();
+  if(code.length!==8){flashFriend("Friend codes are 8 characters.",true);return}
+  const {data:fname,error}=await sb.rpc("add_friend",{p_code:code});
+  if(error){flashFriend(error.message||"Couldn't add that friend.",true);return}
+  $("friendCode").value="";flashFriend(`You're now friends with ${fname}.`);loadBoard();
+});
 
 /* ---------- install as an app ---------- */
 let installEvt=null;
