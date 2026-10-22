@@ -178,6 +178,10 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .pn{font-weight:700;flex:1;min-width:0}
 .prow .pill{flex:none}
 .prow button:disabled{opacity:.6;cursor:default}
+.wrap{padding-bottom:84px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:6px;background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.tabbar button{flex:1;background:none;border:0;border-radius:8px;color:var(--muted);font:inherit;font-size:1rem;padding:10px 4px;cursor:pointer}
+.tabbar button[aria-current="page"]{color:var(--gold);background:var(--panel-2)}
 </style>
 </head>
 <body>
@@ -189,11 +193,11 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <div class="tools"><span class="sync" id="sync">Loading your kingdom…</span><button id="install" hidden>Install app</button></div>
   </header>
 
-  <section class="realm" aria-label="Your kingdom">
+  <section class="realm" aria-label="Your kingdom" data-tab="kingdom">
     <canvas id="cv"></canvas>
     <div class="hud">
       <div class="chip gold"><span class="k">Treasury</span><span class="v" id="hBal">$0</span></div>
-      <div class="chip"><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
+      <div class="chip" hidden><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
       <div class="chip"><span class="k">Lifetime saved</span><span class="v" id="hLife">$0</span></div>
       <div class="chip"><span class="k">Streak</span><span class="v" id="hStreak">0 wk</span></div>
     </div>
@@ -210,16 +214,17 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     </div>
   </section>
 
-  <section style="display:flex;flex-direction:column;gap:10px">
+  <div class="next" id="next" data-tab="kingdom"></div>
+
+  <section data-tab="kingdom" style="display:flex;flex-direction:column;gap:10px">
     <h2>Your Creatures</h2>
-    <p class="sub">Each creature's rarity is rolled the moment it first joins you, and its colors, horns and markings are generated just for your kingdom. A longer deposit streak improves your odds.</p>
+    <p class="sub">Each creature is one of a kind. Its rarity is rolled the first time it joins you.</p>
     <div class="beasts" id="beasts"></div>
   </section>
 
-  <div class="grid">
+  <div class="grid" data-tab="kingdom">
     <section class="panel">
       <h2>The Treasury</h2>
-      <div class="next" id="next"></div>
       <form id="f" autocomplete="off">
         <div class="amt"><span>$</span><input id="amt" inputmode="decimal" placeholder="0.00" aria-label="Amount"></div>
         <input type="text" id="note" placeholder="Note (optional), e.g. paycheck, sold a GPU">
@@ -239,9 +244,9 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     </section>
   </div>
 
-  <section class="panel" id="questPanel">
+  <section class="panel" id="questPanel" data-tab="quests">
     <h2>Quests &amp; Eggs</h2>
-    <p class="hint">Quests reset every Monday. Each one you finish drops an egg. An egg hatches once you deposit its amount, so new saving is what opens it.</p>
+    <p class="hint">Quests reset every Monday. Finish one to get an egg. Deposit its amount to hatch it.</p>
     <h3 class="sub-h">This week</h3>
     <div id="questList" class="qlist"></div>
     <h3 class="sub-h">Your nest</h3>
@@ -252,7 +257,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <p class="err" id="questMsg" hidden></p>
   </section>
 
-  <section class="panel" id="friendsPanel">
+  <section class="panel" id="friendsPanel" data-tab="friends">
     <h2>Friends</h2>
     <div class="fgrid">
       <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
@@ -274,7 +279,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <ol class="board" id="board"></ol>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-tab="history">
     <h2>Royal Ledger</h2>
     <div class="scroll"><table id="ledger"></table></div>
   </section>
@@ -1213,11 +1218,26 @@ $("f").addEventListener("submit",ev=>{
 $("ledger").addEventListener("click",e=>{const bt=e.target.closest("button.x");if(!bt)return;data.entries=data.entries.filter(x=>x.id!==bt.dataset.id);render(false);queue({t:"del",id:bt.dataset.id})});
 
 new ResizeObserver(resize).observe(cv);
+/* one job per screen: the tab bar switches between them */
+function showTab(t){
+  document.querySelectorAll("[data-tab]").forEach(el=>{el.hidden=el.dataset.tab!==t});
+  document.querySelectorAll("#tabbar button").forEach(b=>b.setAttribute("aria-current",b.dataset.go===t?"page":"false"));
+  if(t==="kingdom")resize();
+  scrollTo(0,0);
+}
+document.addEventListener("click",e=>{const b=e.target.closest("#tabbar button");if(b)showTab(b.dataset.go)});
+showTab("kingdom");
 resize();
 if(!reduce)requestAnimationFrame(loop);
 boot();
 setTimeout(()=>drawPortraits(0),50);
 </script>
 
+<nav class="tabbar" id="tabbar" aria-label="Sections">
+  <button type="button" data-go="kingdom" aria-current="page">Kingdom</button>
+  <button type="button" data-go="quests" aria-current="false">Quests</button>
+  <button type="button" data-go="friends" aria-current="false">Friends</button>
+  <button type="button" data-go="history" aria-current="false">History</button>
+</nav>
 </body>
 </html>
