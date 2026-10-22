@@ -37,7 +37,7 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,6vw,2.8rem);l
 .sync{font-size:.82rem;color:var(--muted)}
 .realm{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#080a16}
 #cv{display:block;margin:0 auto;image-rendering:pixelated;cursor:pointer}
-.hud{position:absolute;left:10px;top:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.hud{display:flex;gap:6px;flex-wrap:wrap}
 .chip{background:rgba(8,9,20,.74);border:1px solid rgba(255,255,255,.09);border-radius:6px;padding:4px 10px}
 .chip .k{display:block;font-family:var(--pixel);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
 .chip .v{font-family:var(--pixel);font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums}
@@ -183,6 +183,8 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .tabbar button{flex:1;background:none;border:0;border-radius:8px;color:var(--muted);font:inherit;font-size:1rem;padding:10px 4px;cursor:pointer}
 .tabbar button[aria-current="page"]{color:var(--gold);background:var(--panel-2)}
 #detail{background:rgba(8,10,22,.97)}
+#detail canvas{width:min(220px,70vw)}
+#detail .card{gap:6px}
 #detail .card{background:none}
 .beast .top{flex-wrap:wrap}
 .beast .nm{font-size:1.15rem}
@@ -197,14 +199,15 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <div class="tools"><span class="sync" id="sync">Loading your kingdom…</span><button id="install" hidden>Install app</button></div>
   </header>
 
+  <div class="hud" data-tab="kingdom">
+    <div class="chip gold"><span class="k">Treasury</span><span class="v" id="hBal">$0</span></div>
+    <div class="chip" hidden><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
+    <div class="chip"><span class="k">Lifetime saved</span><span class="v" id="hLife">$0</span></div>
+    <div class="chip"><span class="k">Streak</span><span class="v" id="hStreak">0 wk</span></div>
+    </div>
+
   <section class="realm" aria-label="Your kingdom" data-tab="kingdom">
     <canvas id="cv"></canvas>
-    <div class="hud">
-      <div class="chip gold"><span class="k">Treasury</span><span class="v" id="hBal">$0</span></div>
-      <div class="chip" hidden><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
-      <div class="chip"><span class="k">Lifetime saved</span><span class="v" id="hLife">$0</span></div>
-      <div class="chip"><span class="k">Streak</span><span class="v" id="hStreak">0 wk</span></div>
-    </div>
     <div class="toast" id="toast" hidden></div>
     <div class="reveal" id="detail" hidden>
       <div class="card">
@@ -227,15 +230,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     </div>
   </section>
 
-  <div class="next" id="next" data-tab="kingdom"></div>
-
-  <section data-tab="kingdom" style="display:flex;flex-direction:column;gap:10px">
-    <h2>Your Creatures</h2>
-    <p class="sub">Each creature is one of a kind. Its rarity is rolled the first time it joins you.</p>
-    <div class="beasts" id="beasts"></div>
-  </section>
-
-  <div class="grid" data-tab="kingdom">
+  <div data-tab="kingdom" style="display:flex;flex-direction:column;gap:18px">
     <section class="panel">
       <h2>The Treasury</h2>
       <form id="f" autocomplete="off">
@@ -249,7 +244,17 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
         <p class="err" id="err" hidden></p>
         <p class="hint">Deposit and Withdraw change your treasury. Set balance matches it to what your savings account shows. Your money stays in your bank; this only tracks it.</p>
       </form>
+      <div class="next" id="next"></div>
     </section>
+  </div>
+
+  <section data-tab="kingdom" style="display:flex;flex-direction:column;gap:10px">
+    <h2>Your Creatures</h2>
+    <p class="sub">Each creature is one of a kind. Its rarity is rolled the first time it joins you.</p>
+    <div class="beasts" id="beasts"></div>
+  </section>
+
+  <div data-tab="kingdom">
     <section class="panel">
       <h2>The Road to Power</h2>
       <ol class="road" id="road"></ol>
@@ -1128,6 +1133,8 @@ function openDetail(h){
   $("detName").textContent=name;$("detSp").textContent=sub;$("detail").hidden=false;
 }
 $("detOk").addEventListener("click",()=>{$("detail").hidden=true});
+$("detail").addEventListener("click",e=>{if(e.target.id==="detail")$("detail").hidden=true});
+addEventListener("keydown",e=>{if(e.key==="Escape")$("detail").hidden=true});
 cv.addEventListener("click",e=>{
   const r=cv.getBoundingClientRect(),bx=(e.clientX-r.left)/r.width*LW,by=(e.clientY-r.top)/r.height*LH;
   const h=[...hits].reverse().find(q=>bx>=q.x&&bx<=q.x+q.w&&by>=q.y&&by<=q.y+q.h);
