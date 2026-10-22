@@ -1,6 +1,6 @@
 // Save Me service worker: keeps the app opening offline.
 // Bump VERSION whenever you change index.html or other app files, so phones pick up the update.
-const VERSION = "save-me-v10";
+const VERSION = "save-me-v11";
 const SHELL = [
   "./",
   "./index.html",

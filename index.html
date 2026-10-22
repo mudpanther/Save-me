@@ -387,19 +387,21 @@ const fmt=n=>"$"+n.toLocaleString("en-US",{minimumFractionDigits:n%1?2:0,maximum
 const $=id=>document.getElementById(id);
 const r2=n=>Math.round(n*100)/100;
 
+// All money is summed in whole cents so rounding can never drift. Dollars are only for display.
+const cents=x=>Math.round(x*100);
 function compute(){
   const list=[...data.entries].sort((a,b)=>a.t-b.t);
   let bal=0,life=0,peak=0;const weeks=new Set();
   for(const e of list){
-    const before=bal;
-    if(e.kind==="deposit")bal+=e.amt; else if(e.kind==="withdraw")bal=Math.max(0,bal-e.amt); else bal=e.amt;
+    const before=bal,a=cents(e.amt);
+    if(e.kind==="deposit")bal+=a; else if(e.kind==="withdraw")bal=Math.max(0,bal-a); else bal=a;
     if(bal>before){life+=bal-before;weeks.add(weekOf(e.t))}
     peak=Math.max(peak,bal);
   }
   let streak=0,w=weekOf(Date.now());
   if(!weeks.has(w))w--;
   while(weeks.has(w)){streak++;w--}
-  return {bal:r2(bal),life:r2(life),peak,streak};
+  return {bal:bal/100,life:life/100,peak:peak/100,streak};
 }
 function weekOf(t){return Math.floor((Math.floor(t/864e5)+3)/7)}
 function habitWeeks(){
@@ -665,12 +667,12 @@ const petName=id=>(PETS.find(p=>p.id===id)||{}).name||id;
 const petObj=p=>({id:"pet:"+p.id,type:((PETS.find(x=>x.id===p.species)||{}).type)||"drake",rar:p.rarity,shiny:!!p.shiny});
 const one=x=>Array.isArray(x)?x[0]:x;
 function eggProgress(p){const since=Date.parse(p.created_at)||0;
-  return r2(data.entries.filter(e=>e.kind==="deposit"&&e.t>=since).reduce((s,e)=>s+e.amt,0))}
+  return data.entries.filter(e=>e.kind==="deposit"&&e.t>=since).reduce((s,e)=>s+cents(e.amt),0)/100}
 function flashIn(id,t,bad){const m=$(id);m.textContent=t;m.style.color=bad?"":"var(--good)";m.className=bad?"err":"";m.hidden=false;setTimeout(()=>m.hidden=true,4000)}
 function showToast(text){const t=$("toast");t.className="toast";t.innerHTML='<span class="k">Hatched</span><b></b>';t.querySelector("b").textContent=text;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,4500)}
 
 function weekDeposits(){const w=weekOf(Date.now());const d=data.entries.filter(e=>e.kind==="deposit"&&weekOf(e.t)===w);
-  return {count:d.length,sum:r2(d.reduce((s,e)=>s+e.amt,0))}}
+  return {count:d.length,sum:d.reduce((s,e)=>s+cents(e.amt),0)/100}}
 function weekHasWithdraw(){const w=weekOf(Date.now());return data.entries.some(e=>e.kind==="withdraw"&&weekOf(e.t)===w)}
 function questList(){
   const w=weekOf(Date.now()),d=weekDeposits(),wd=weekHasWithdraw();
@@ -1372,7 +1374,7 @@ let submitKind="deposit";
 document.querySelectorAll("button[data-kind]").forEach(bt=>bt.addEventListener("click",()=>submitKind=bt.dataset.kind));
 $("f").addEventListener("submit",ev=>{
   ev.preventDefault();const err=$("err");err.hidden=true;
-  const amt=r2(parseFloat($("amt").value.replace(/[$,\s]/g,"")));
+  const amt=Math.round(parseFloat($("amt").value.replace(/[$,\s]/g,""))*100)/100;
   if(!(amt>=0)||(submitKind!=="set"&&amt<=0)){err.textContent="Enter an amount in dollars, like 50 or 125.50.";err.hidden=false;return}
   const {bal}=compute();
   if(submitKind==="withdraw"&&amt>bal){err.textContent=`Your treasury holds ${fmt(bal)}. Use Set balance if your bank shows a different number.`;err.hidden=false;return}
