@@ -188,6 +188,9 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 #detail .card{background:none}
 .beast .top{flex-wrap:wrap}
 .beast .nm{font-size:1.15rem}
+.pact{display:flex;flex-direction:column;gap:8px;background:var(--panel-2);border-radius:10px;padding:12px}
+.pactline{font-family:var(--body);color:var(--ink);margin:0}
+.pactrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -199,6 +202,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <div class="tools"><span class="sync" id="sync">Loading your kingdom…</span><button id="install" hidden>Install app</button></div>
   </header>
 
+  <p class="hint" id="welcome" data-tab="kingdom" hidden></p>
   <div class="hud" data-tab="kingdom">
     <div class="chip gold"><span class="k">Treasury</span><span class="v" id="hBal">$0</span></div>
     <div class="chip" hidden><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
@@ -294,6 +298,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <p class="err" id="friendMsg" hidden></p>
     <h3 class="sub-h">Leaderboard</h3>
     <p class="hint">Score = rarity points for each creature (Common 1, Rare 3, Epic 6, Legendary 10, Mythic 15) plus 2 per week of streak.</p>
+    <div class="pact" id="pactBox"></div>
     <ol class="board" id="board"></ol>
   </section>
 
@@ -532,8 +537,53 @@ async function ensureProfile(email){
   myProfile={name:made.name,code:made.friend_code};
 }
 function renderMe(){$("myName").value=myProfile.name;$("myCode").textContent=myProfile.code||"--------"}
+async function loadPact(){
+  if(!sb||!uid)return;
+  const [st,fb]=await Promise.all([sb.rpc("pact_status"),sb.rpc("friend_board")]);
+  if(st.error||!st.data)return;
+  renderPact(st.data,(fb.data||[]).filter(r=>!r.is_me));
+}
+function renderPact(s,friends){
+  const box=$("pactBox");box.innerHTML="";
+  const h=document.createElement("h3");h.className="sub-h";h.textContent="Accountability pact";box.appendChild(h);
+  const p=document.createElement("p");p.className="hint";box.appendChild(p);
+  const act=async(fn,args,ok)=>{const {error}=await sb.rpc(fn,args);if(error){flashFriend(/already/.test(error.message||"")?"One of you already has a pact.":"Couldn't do that. Try again.",true);return}if(ok)flashFriend(ok);loadPact()};
+  if(s.partner){
+    p.textContent=`You and ${s.partner.name} keep each other honest. You see check-ins, never balances.`;
+    const days=s.partner_last_checkin?Math.floor((Date.now()-s.partner_last_checkin)/864e5):null;
+    const line=document.createElement("p");line.className="pactline";
+    line.textContent=days===null?`${s.partner.name} hasn't checked in yet.`:days===0?`${s.partner.name} checked in today.`:`${s.partner.name} last checked in ${days} day${days===1?"":"s"} ago.`;
+    box.appendChild(line);
+    const end=document.createElement("button");end.type="button";end.className="link";end.textContent="End pact";
+    end.addEventListener("click",()=>act("end_pact",{},"Pact ended."));
+    box.appendChild(end);return;
+  }
+  p.textContent="Pick a friend to keep you honest. A pact starts once you both ask. You see check-ins, never balances.";
+  const outgoing=new Set(s.outgoing||[]),incoming=s.incoming||[];
+  incoming.forEach(f=>{
+    const row=document.createElement("div");row.className="pactrow";
+    const t=document.createElement("span");t.textContent=`${f.name} wants a pact with you.`;
+    const b=document.createElement("button");b.type="button";b.textContent="Accept";
+    b.addEventListener("click",()=>act("propose_pact",{p_friend:f.id},"Pact started."));
+    row.append(t,b);box.appendChild(row);
+  });
+  friends.filter(f=>!incoming.some(i=>i.id===f.player_id)).forEach(f=>{
+    const row=document.createElement("div");row.className="pactrow";
+    const t=document.createElement("span");t.textContent=outgoing.has(f.player_id)?`Waiting for ${f.name} to accept.`:`${f.name}`;
+    row.appendChild(t);
+    if(!outgoing.has(f.player_id)){const b=document.createElement("button");b.type="button";b.textContent="Ask for a pact";
+      b.addEventListener("click",()=>act("propose_pact",{p_friend:f.player_id},"Request sent."));row.appendChild(b)}
+    box.appendChild(row);
+  });
+}
+function welcomeBack(){
+  const last=data.entries.reduce((m,e)=>Math.max(m,e.t),0);
+  const days=last?Math.floor((Date.now()-last)/864e5):0;
+  const w=$("welcome");
+  if(days>=2){w.textContent="Welcome back. Your kingdom kept the lights on for you.";w.hidden=false}else w.hidden=true;
+}
 async function loadFriends(){
-  try{await ensureProfile(myEmail);renderMe();await loadBoard()}
+  try{await ensureProfile(myEmail);renderMe();await loadBoard();await loadPact()}
   catch(e){flashFriend("Couldn't load your friends list. Try again in a moment.",true)}
 }
 async function loadBoard(){
@@ -1252,6 +1302,7 @@ function drawPortraits(t){portraits.forEach(p=>p.egg?eggPortrait(p.cvs,t):drawPo
 /* =================== UI =================== */
 let showAll=false;
 function render(initial){
+  welcomeBack();
   const {bal,life,peak,streak}=compute();
   const ids=new Set(MIL.filter(m=>bal>=m.at).map(m=>m.id));
   state.bal=bal;state.ids=ids;state.cre={};
