@@ -163,6 +163,21 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .traits span.pill.r-epic{color:var(--epic)}
 .traits span.pill.r-legendary{color:var(--legendary)}
 .traits span.pill.r-mythic{background:linear-gradient(90deg,#ff7ad9,#8fd3ff,#ffe27a,#ff7ad9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;border-color:var(--mythic)}
+.qlist{display:flex;flex-direction:column;gap:8px}
+.qrow,.erow,.prow{background:var(--panel-2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.qrow{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
+.qt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.qn{font-weight:700}
+.qp{font-size:.85rem;color:var(--muted)}
+.qrow button{flex:none}
+.etop{display:flex;justify-content:space-between;gap:8px}
+.et{font-weight:700}
+.ep{font-family:var(--pixel);color:var(--gold);font-variant-numeric:tabular-nums}
+.prow{flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap}
+.prow.on{outline:1px solid var(--gold)}
+.pn{font-weight:700;flex:1;min-width:0}
+.prow .pill{flex:none}
+.prow button:disabled{opacity:.6;cursor:default}
 </style>
 </head>
 <body>
@@ -223,6 +238,19 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
       <button class="link" id="roadToggle">Show the full road</button>
     </section>
   </div>
+
+  <section class="panel" id="questPanel">
+    <h2>Quests &amp; Eggs</h2>
+    <p class="hint">Quests reset every Monday. Each one you finish drops an egg. An egg hatches once you deposit its amount, so new saving is what opens it.</p>
+    <h3 class="sub-h">This week</h3>
+    <div id="questList" class="qlist"></div>
+    <h3 class="sub-h">Your nest</h3>
+    <div id="eggsList" class="qlist"></div>
+    <h3 class="sub-h">Your pets</h3>
+    <p class="hint">Pick one to fly over your kingdom. Shinies are rare and shimmer gold.</p>
+    <div id="petsList" class="qlist"></div>
+    <p class="err" id="questMsg" hidden></p>
+  </section>
 
   <section class="panel" id="friendsPanel">
     <h2>Friends</h2>
@@ -366,7 +394,6 @@ async function flush(){
       const op=q[0];let res;
       if(op.t==="add")res=await sb.from("entries").upsert({...op.row,user_id:uid},{onConflict:"id",ignoreDuplicates:true});
       else if(op.t==="del")res=await sb.from("entries").delete().eq("id",op.id);
-      else if(op.t==="cre")res=await sb.from("creatures").upsert({user_id:uid,creature_id:op.id,rarity:op.rarity},{onConflict:"user_id,creature_id",ignoreDuplicates:true});
       else res={};
       if(res.error)throw res.error;
       setOutbox(outbox().slice(1));
@@ -395,7 +422,6 @@ async function pull(){
   const have=new Set(entries.map(r=>r.id));
   pend.filter(o=>o.t==="add"&&!have.has(o.row.id)).forEach(o=>entries.push({...o.row}));
   const cre={};c.data.forEach(r=>cre[r.creature_id]={rarity:r.rarity,t:Date.parse(r.rolled_at)||0});
-  pend.filter(o=>o.t==="cre"&&!cre[o.id]).forEach(o=>cre[o.id]={rarity:o.rarity,t:Date.now()});
   const seedChanged=data.seed!==seed||JSON.stringify(data.cre)!==JSON.stringify(cre);
   data={entries:entries.filter(r=>!dels.has(r.id)),seed,cre};
   if(seedChanged)invalidateSprites();
@@ -406,13 +432,13 @@ async function startSession(user){
   const cached=cacheLoad();
   if(cached&&cached.seed){data=cached;if(!data.cre)data.cre={};loaded=true;invalidateSprites();render(true)}
   setSync("Syncing…");
-  try{await pull();loaded=true;render(true);setSync("Saved");flush();loadFriends()}
+  try{await pull();loaded=true;render(true);setSync("Saved");flush();loadFriends();loadPets()}
   catch(err){
     if(cached&&cached.seed){setSync(navigator.onLine?"Couldn't reach the server. Showing your last save.":"Offline. Showing your last save.")}
     else setSync("Couldn't load your kingdom. Check your connection and reopen the app.");
   }
 }
-async function resync(){if(!sb||!uid)return;try{await flush();await pull();render(false);loadBoard()}catch(e){}}
+async function resync(){if(!sb||!uid)return;try{await flush();await pull();render(false);loadBoard();loadPets()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resync()});
 addEventListener("online",resync);
 
@@ -500,8 +526,8 @@ function renderBoard(rows){
     const list=r.creatures||[];
     if(!list.length){const s=document.createElement("span");s.textContent="No creatures yet";pills.appendChild(s)}
     list.forEach(c=>{const s=document.createElement("span");s.className="pill r-"+c.r;
-      const sp=(CRE.find(x=>x.id===c.id)||{}).species||c.id;
-      s.textContent=sp+" · "+RAR_NAME[c.r];pills.appendChild(s)});
+      const sp=(CRE.find(x=>x.id===c.id)||{}).species||petName(c.id);
+      s.textContent=(c.s?"Shiny ":"")+sp+" · "+RAR_NAME[c.r];pills.appendChild(s)});
     li.append(head,sub,pills);
     if(!r.is_me){const rm=document.createElement("button");rm.type="button";rm.className="link";rm.textContent="Remove friend";
       rm.addEventListener("click",()=>removeFriend(r.player_id,r.name));li.appendChild(rm)}
@@ -534,6 +560,139 @@ $("addFriend").addEventListener("submit",async e=>{
   $("friendCode").value="";flashFriend(`You're now friends with ${fname}.`);loadBoard();
 });
 
+/* ---------- eggs, pets, quests & companion ---------- */
+const PETS=[
+ {id:"ember_whelp",name:"Ember Whelp",type:"drake"},
+ {id:"frost_drake",name:"Frost Drake",type:"drake"},
+ {id:"glimmer_hawk",name:"Glimmer Hawk",type:"bird"},
+ {id:"storm_wren",name:"Storm Wren",type:"bird"},
+ {id:"lantern_sprite",name:"Lantern Sprite",type:"bird"},
+ {id:"tide_eel",name:"Tide Eel",type:"serpent"},
+ {id:"sand_wyrmling",name:"Sand Wyrmling",type:"serpent"},
+ {id:"star_koi",name:"Star Koi",type:"celestial"}];
+const EGGS={small:{need:100,name:"Small egg"},big:{need:500,name:"Big egg"},rare:{need:2000,name:"Rare egg"}};
+let petList=[], companionId=null, companionObj=null, hatching=false, starterTried=false;
+const petName=id=>(PETS.find(p=>p.id===id)||{}).name||id;
+const petObj=p=>({id:"pet:"+p.id,type:((PETS.find(x=>x.id===p.species)||{}).type)||"drake",rar:p.rarity,shiny:!!p.shiny});
+const one=x=>Array.isArray(x)?x[0]:x;
+function eggProgress(p){const since=Date.parse(p.created_at)||0;
+  return r2(data.entries.filter(e=>e.kind==="deposit"&&e.t>=since).reduce((s,e)=>s+e.amt,0))}
+function flashIn(id,t,bad){const m=$(id);m.textContent=t;m.style.color=bad?"":"var(--good)";m.className=bad?"err":"";m.hidden=false;setTimeout(()=>m.hidden=true,4000)}
+function showToast(text){const t=$("toast");t.className="toast";t.innerHTML='<span class="k">Hatched</span><b></b>';t.querySelector("b").textContent=text;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,4500)}
+
+function weekDeposits(){const w=weekOf(Date.now());const d=data.entries.filter(e=>e.kind==="deposit"&&weekOf(e.t)===w);
+  return {count:d.length,sum:r2(d.reduce((s,e)=>s+e.amt,0))}}
+function weekHasWithdraw(){const w=weekOf(Date.now());return data.entries.some(e=>e.kind==="withdraw"&&weekOf(e.t)===w)}
+function questList(){
+  const w=weekOf(Date.now()),d=weekDeposits(),wd=weekHasWithdraw();
+  return [
+    {key:"deposit3",title:"Deposit 3 times",prog:`${Math.min(d.count,3)} of 3 deposits`,done:d.count>=3,egg:"small"},
+    {key:"save100",title:"Save $100 this week",prog:`${fmt(Math.min(d.sum,100))} of $100`,done:d.sum>=100,egg:"big"},
+    {key:"nowithdraw",title:"No withdrawals this week",prog:wd?"You withdrew this week":(d.count?"Clean so far":"Make a deposit first"),done:d.count>0&&!wd,egg:"small"}
+  ].map(q=>({...q,source:`quest:${q.key}:${w}`}));
+}
+
+async function loadPets(){
+  const [pr,pe]=await Promise.all([
+    sb.from("pets").select("id,kind,egg_tier,need,source,species,rarity,shiny,created_at").eq("user_id",uid).order("created_at"),
+    sb.from("profiles").select("companion_id").eq("user_id",uid).maybeSingle()]);
+  if(pr.error){flashIn("questMsg","Couldn't load your eggs. Try again in a moment.",true);return}
+  petList=pr.data||[];
+  if(!petList.some(p=>p.source==="starter")&&!starterTried){
+    starterTried=true;
+    const {error}=await sb.rpc("ensure_starter");
+    if(!error)return loadPets();
+  }
+  companionId=(one(pe.data)||{}).companion_id||null;
+  const cp=petList.find(p=>p.id===companionId&&p.kind==="pet");
+  companionObj=cp?petObj(cp):null;
+  renderQuestPanel();tryHatch();
+}
+
+async function tryHatch(){
+  if(hatching||!uid)return;
+  const ready=petList.find(p=>p.kind==="egg"&&eggProgress(p)>=p.need);
+  if(!ready)return;
+  hatching=true;
+  await flush();
+  const {data:res,error}=await sb.rpc("hatch_egg",{p_egg:ready.id});
+  hatching=false;
+  if(error||!res){flashIn("questMsg","Your egg is ready but didn't hatch yet. Try again in a moment.",true);return}
+  showToast(`${res.shiny?"Shiny ":""}${petName(res.species)} · ${RAR_NAME[res.rarity]}`);
+  loadPets();
+}
+
+async function claimQuest(q){
+  await flush();
+  const {error}=await sb.rpc("claim_quest",{p_key:q.key});
+  if(error){flashIn("questMsg",/finished/.test(error.message||"")?"Finish this quest first.":"Couldn't claim that. Try again.",true);return}
+  flashIn("questMsg",`${EGGS[q.egg].name} added to your nest.`);
+  loadPets();
+}
+
+const claiming=new Set();
+async function claimCreature(id){
+  if(!sb||!uid||claiming.has(id))return;
+  claiming.add(id);
+  try{
+    await flush();
+    const {data:rar,error}=await sb.rpc("claim_creature",{p_creature:id});
+    if(error||!rar)return;
+    data.cre[id]={rarity:rar,t:Date.now()};cacheSave();invalidateSprites();
+    const c=CRE.find(x=>x.id===id);if(c)revealQ.push(c);
+    render(false);
+  }finally{claiming.delete(id)}
+}
+
+async function setCompanion(id){
+  const {error}=await sb.rpc("set_companion",{p_pet:id});
+  if(error){flashIn("questMsg","Couldn't set your companion. Try again.",true);return}
+  companionId=id;const cp=petList.find(p=>p.id===id);companionObj=cp?petObj(cp):null;
+  renderQuestPanel();
+}
+
+function renderQuestPanel(){
+  const pw=$("petsList");pw.innerHTML="";
+  const pets=petList.filter(p=>p.kind==="pet");
+  if(!pets.length)pw.innerHTML='<p class="empty">No pets yet. Hatch an egg to get one.</p>';
+  pets.forEach(p=>{
+    const row=document.createElement("div");row.className="prow"+(p.id===companionId?" on":"");
+    row.innerHTML='<span class="pill"></span><span class="pn"></span><button type="button" class="link"></button>';
+    const pill=row.querySelector(".pill");pill.className="pill r-"+p.rarity;pill.textContent=RAR_NAME[p.rarity];
+    row.querySelector(".pn").textContent=(p.shiny?"Shiny ":"")+petName(p.species);
+    const b=row.querySelector("button");b.textContent=p.id===companionId?"Flying with you":"Fly with me";
+    b.disabled=p.id===companionId;b.addEventListener("click",()=>setCompanion(p.id));
+    pw.appendChild(row);
+  });
+
+  const ew=$("eggsList");ew.innerHTML="";
+  const eggs=petList.filter(p=>p.kind==="egg");
+  if(!eggs.length)ew.innerHTML='<p class="empty">No eggs in your nest. Finish a weekly quest to earn one.</p>';
+  eggs.forEach(e=>{
+    const have=Math.min(eggProgress(e),e.need),pct=e.need?Math.round(have/e.need*100):0;
+    const div=document.createElement("div");div.className="erow";
+    div.innerHTML='<div class="etop"><span class="et"></span><span class="ep"></span></div><div class="bar"><i></i></div>';
+    div.querySelector(".et").textContent=EGGS[e.egg_tier].name;
+    div.querySelector(".ep").textContent=`${fmt(have)} of ${fmt(e.need)}`;
+    div.querySelector(".bar i").style.width=pct+"%";
+    ew.appendChild(div);
+  });
+
+  const qw=$("questList");qw.innerHTML="";
+  questList().forEach(q=>{
+    const claimed=petList.some(p=>p.source===q.source);
+    const row=document.createElement("div");row.className="qrow";
+    row.innerHTML='<div class="qt"><span class="qn"></span><span class="qp"></span></div><button type="button"></button>';
+    row.querySelector(".qn").textContent=q.title+" → "+EGGS[q.egg].name;
+    row.querySelector(".qp").textContent=q.prog;
+    const b=row.querySelector("button");
+    b.textContent=claimed?"Claimed":q.done?"Claim":"Not yet";
+    b.disabled=claimed||!q.done;
+    b.addEventListener("click",()=>claimQuest(q));
+    qw.appendChild(row);
+  });
+}
+
 /* ---------- install as an app ---------- */
 let installEvt=null;
 addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEvt=e;$("install").hidden=false});
@@ -551,7 +710,7 @@ const HUE_NAMES=[[15,"Crimson"],[38,"Ember"],[55,"Amber"],[80,"Sulfur"],[150,"Ja
 const hueName=h=>{h=((h%360)+360)%360;return HUE_NAMES.find(x=>h<x[0])[1]};
 const geneCache={};
 function genes(c){
-  const rar=data.cre[c.id]?.rarity||"unknown"; const key=c.id+rar+data.seed;
+  const rar=c.rar||data.cre[c.id]?.rarity||"unknown"; const key=c.id+rar+data.seed;
   if(geneCache[key])return geneCache[key];
   const R=prng(hash((data.seed||"x")+c.id));
   const name=SYL1[Math.floor(R()*SYL1.length)]+SYL2[Math.floor(R()*SYL2.length)];
@@ -605,12 +764,16 @@ function pixelate(c,outline){
 }
 function hexRgb(h){const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
 function flip(c){const f=mk(c.width,c.height),x=f.getContext("2d");x.translate(c.width,0);x.scale(-1,1);x.drawImage(c,0,0);return f}
+function shinify(c){const x=c.getContext("2d"),im=x.getImageData(0,0,c.width,c.height),d=im.data;
+  for(let i=0;i<d.length;i+=4){if(d[i+3]>0){const r=d[i],g=d[i+1],b=d[i+2];
+    d[i]=Math.min(255,r*.45+g*.5+80);d[i+1]=Math.min(255,g*.45+b*.25+r*.3+70);d[i+2]=Math.min(255,b*.5+r*.15+30)}}
+  x.putImageData(im,0,0);return c}
 function getSprite(c,k,frame,dir=1){
-  const g=genes(c);const key=c.id+g.rar+k+"|"+frame+"|"+dir;
+  const g=genes(c);const key=c.id+g.rar+(c.shiny?"s":"")+k+"|"+frame+"|"+dir;
   if(sprites[key])return sprites[key];
   let s;
   if(dir<0)s=flip(getSprite(c,k,frame,1));
-  else{const gen={drake:genDrake,bird:genBird,serpent:genSerpent,celestial:genSerpent,titan:genTitan}[c.type];s=pixelate(gen(g,k,frame,c.type),g.p.outline)}
+  else{const gen={drake:genDrake,bird:genBird,serpent:genSerpent,celestial:genSerpent,titan:genTitan}[c.type];s=pixelate(gen(g,k,frame,c.type),g.p.outline);if(c.shiny)s=shinify(s)}
   sprites[key]=s;return s;
 }
 function wingShape(x,ty,mem,bone,feather){
@@ -890,6 +1053,9 @@ function frame(t){
     b.drawImage(spr,Math.round(X-spr.width/2),Math.round(Y-spr.height/2));
     if(dk>=2&&!reduce&&(t%5200)<1100){const S=[.8,.8,.85,.9,.95,1.2,1.45,1.65][dk];const mxp=X+dir*(29.5*S),myp=Y+(-9.2+4)*S;
       const g=genes(dr);for(let i=0;i<3;i++)emit(mxp,myp,dir*(1+Math.random()*1.2),(Math.random()-.5)*.35,22+Math.random()*10,["#ffe08a","#ff9b3d","#e5583b",g.p.glow||"#ffb347"][Math.floor(Math.random()*4)])}}
+  // companion pet flying over the kingdom
+  if(companionObj){const cdir=Math.cos(t/3000)>=0?1:-1;const spr=getSprite(companionObj,1,Math.floor(t/150)%4,cdir);
+    const X=cx+Math.sin(t/3000)*LW*.3,Y=58+(reduce?0:Math.sin(t/800)*3);b.drawImage(spr,Math.round(X-spr.width/2),Math.round(Y-spr.height/2))}
   // particles
   for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.x+=q.vx*dt/16;q.y+=q.vy*dt/16;q.vy+=q.grav;q.life--;
     if(q.life<=0||q.x<-5||q.x>LW+5){parts.splice(i,1);continue}
@@ -986,7 +1152,7 @@ function render(initial){
   const {bal,life,peak,streak}=compute();
   const ids=new Set(MIL.filter(m=>bal>=m.at).map(m=>m.id));
   state.bal=bal;state.ids=ids;state.cre={};
-  if(loaded){CRE.forEach(c=>{if(stageOf(c,bal)>=1&&!data.cre[c.id]){data.cre[c.id]={rarity:roll(streak),t:Date.now()};invalidateSprites();revealQ.push(c);queue({t:"cre",id:c.id,rarity:data.cre[c.id].rarity})}})}
+  if(loaded){CRE.forEach(c=>{if(stageOf(c,bal)>=1&&!data.cre[c.id])claimCreature(c.id)})}
   CRE.forEach(c=>{const k=stageOf(c,bal);state.cre[c.id]=data.cre[c.id]?k:0});
   $("hBal").textContent=fmt(bal);$("hArmy").textContent=Math.floor(bal/5).toLocaleString();$("hLife").textContent=fmt(life);
   $("hStreak").textContent=streak+" wk"+(streak?" · +"+Math.min(8,streak)*10+"% luck":"");
@@ -1015,6 +1181,7 @@ function render(initial){
     if(gained.length)toast(false,gained[gained.length-1],gained.length);else if(lost.length)toast(true,lost[lost.length-1],lost.length,bal)}
   lastUnlocked=ids;
   if(revealQ.length&&$("reveal").hidden)showReveal();
+  if(loaded){renderQuestPanel();tryHatch()}
   if(reduce)frame(0);
 }
 let toastT;

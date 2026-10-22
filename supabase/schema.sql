@@ -51,11 +51,10 @@ create policy "own entries delete" on public.entries for delete to authenticated
 drop policy if exists "own creatures read"   on public.creatures;
 drop policy if exists "own creatures insert" on public.creatures;
 create policy "own creatures read"   on public.creatures for select to authenticated using (user_id = (select auth.uid()));
-create policy "own creatures insert" on public.creatures for insert to authenticated with check (user_id = (select auth.uid()));
--- No update policy: once a rarity is rolled it is permanent.
+-- No insert or update policy: creatures are rolled by the claim_creature() function (see quests.sql), so rarity is permanent.
 
 -- Let signed-in players reach these tables through the app (row-level security above still applies).
 grant select, insert on public.kingdoms to authenticated;
 grant select, insert, delete on public.entries to authenticated;
-grant select, insert on public.creatures to authenticated;
+grant select on public.creatures to authenticated;
 revoke all on public.kingdoms, public.entries, public.creatures from anon;
