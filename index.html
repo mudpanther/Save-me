@@ -325,19 +325,22 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 /* =================== progression =================== */
 const BUILD=[
  {at:0,id:"camp",name:"Exile's Camp",d:"A tent, a fire, and a plan."},
+ {at:0,id:"hut",name:"Exile's Hut",d:"A timber-and-thatch cabin. Your seat of power."},
+ {at:5000,id:"stonehouse",name:"Stone House",d:"Walls of stone. Your home is built to last."},
+ {at:10000,id:"manor",name:"Manor House",d:"Two floors, shuttered windows and a banner at the door."},
+ {at:25000,id:"keep",name:"Stone Keep",d:"Your first true fortress."},
  {at:50,id:"scouts",name:"Torchbearer Scouts",d:"Scouts guard the road at night."},
  {at:100,id:"palisade",name:"Timber Palisade",d:"A wooden wall rings your land."},
  {at:250,id:"tower",name:"Watchtower",d:"A brazier burns on the high platform."},
  {at:400,id:"farms",name:"Farmsteads",d:"Cottages, chimneys and fields. Settlers arrive."},
- {at:600,id:"keep",name:"Stone Keep",d:"Your first true fortress."},
  {at:800,id:"ward",name:"Sacred Wind Barrier",d:"A ring of living wind guards the realm."},
  {at:1250,id:"harbor",name:"Harbor & Fishing Boats",d:"Lanterns bob on the lake."},
  {at:2500,id:"walls",name:"Great Walls & Knights",d:"Towers, gold banners, an armored guard."},
  {at:4000,id:"mage",name:"Mage Tower",d:"An orb of starlight crowns the spire."},
- {at:7500,id:"castle",name:"Grand Castle",d:"The keep rises into a true castle."},
+ {at:75000,id:"castle",name:"Grand Castle",d:"The keep rises into a true castle."},
  {at:15000,id:"light",name:"Lighthouse & War Fleet",d:"A beam sweeps the lake. Warships anchor."},
  {at:20000,id:"citadel",name:"Floating Citadel",d:"A fortress that rules from the sky."},
- {at:60000,id:"palace",name:"Golden Palace",d:"Gold domes crown every spire."},
+ {at:150000,id:"palace",name:"Golden Palace",d:"Gold domes crown every spire."},
 ];
 const CRE=[
  {id:"dragon",species:"Emberwing Dragon",type:"drake",egg:500,stages:[
@@ -996,6 +999,27 @@ function banner(x,y,t,col){
 }
 function dome(x,y,r){b.fillStyle="#f2c14e";circ(b,x,y,r);b.fillStyle="#ffe08a";circ(b,x-1,y-1,Math.max(1,r-2));R(x,y-r-3,1,3,"#f2c14e")}
 
+function hut(cx,t){
+  const x0=cx-7;
+  R(x0,B-9,15,9,"#8a6444");R(x0,B-9,15,1,"#5a3e28");for(let j=3;j<9;j+=3)R(x0,B-9+j,15,1,"#5a3e28");
+  R(x0+6,B-5,3,5,"#2a1c12");R(x0+10,B-7,2,2,"#ffcf6b");
+  for(let j=0;j<6;j++)R(x0-1+j,B-10-j,17-j*2,1,j%2?"#c9a24a":"#b38c3c");
+}
+function stonehouse(cx,t){
+  const x0=cx-11,w=22,h=14;
+  bricks(x0,B-h,w,h,"#7d7a96","#5f5c78","#9a97b4");
+  for(let j=0;j<6;j++)R(x0-1+j,B-h-1-j,w+2-j*2,1,j%2?"#6b5a4a":"#7b6a58");
+  R(x0+3,B-h+3,3,3,"#ffcf6b");R(x0+w-6,B-h+3,3,3,"#ffcf6b");
+  R(cx-2,B-6,4,6,"#2a1c12");R(x0+w-5,B-h-10,2,6,"#5a5670");
+}
+function manor(cx,t){
+  const x0=cx-15,w=30,h=22;
+  bricks(x0,B-h,w,h,"#8a86a6","#6a6686","#a7a3c4");
+  for(let j=0;j<9;j++)R(x0-2+j,B-h-1-j,w+4-j*2,1,j%2?"#8e3b2b":"#a2472f");
+  for(const wx of [x0+4,x0+w-8])for(const wy of [B-h+4,B-h+12])R(wx,wy,3,4,"#ffcf6b");
+  R(cx-2,B-7,4,7,"#2a1c12");
+  banner(cx,B-h-17,t,"#e8b64f");
+}
 function drawKeep(cx,t){
   const castle=has("castle"),palace=has("palace");
   const w=castle?36:30,h=castle?40:34,x0=cx-w/2,y0=B-h;
@@ -1044,6 +1068,9 @@ function frame(t){
     const pulse=reduce?0:Math.sin(t/300);b.fillStyle="rgba(159,231,255,.15)";circ(b,mx,B-66,6+Math.round(pulse));R(mx-2,B-68,5,5,"#9fe7ff");R(mx-1,B-67,2,2,"#ffffff");
     if(!reduce&&Math.random()<.12)emit(mx+(Math.random()-.5)*6,B-66,(Math.random()-.5)*.2,(Math.random()-.5)*.2,60,"#9fe7ff")}
   if(has("keep"))drawKeep(cx,t);
+  else if(has("manor"))manor(cx,t);
+  else if(has("stonehouse"))stonehouse(cx,t);
+  else hut(cx,t);
   if(has("tower")){const x=cx-80;R(x-6,B-26,2,26,"#5b4026");R(x+5,B-26,2,26,"#5b4026");
     for(let j=0;j<24;j+=8){for(let i=0;i<11;i++){R(x-5+i,B-24+j+Math.floor(i*.7),1,1,"#4a3320");R(x+5-i,B-24+j+Math.floor(i*.7),1,1,"#4a3320")}}
     R(x-8,B-29,17,3,"#6e5034");R(x-8,B-29,17,1,"#8a6744");R(x-8,B-35,1,6,"#5b4026");R(x+8,B-35,1,6,"#5b4026");
