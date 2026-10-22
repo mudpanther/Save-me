@@ -207,6 +207,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <div class="chip gold"><span class="k">Treasury</span><span class="v" id="hBal">$0</span></div>
     <div class="chip" hidden><span class="k">Army</span><span class="v" id="hArmy">0</span></div>
     <div class="chip"><span class="k">Lifetime saved</span><span class="v" id="hLife">$0</span></div>
+    <div class="chip"><span class="k">Habit</span><span class="v" id="hHabit">0 weeks</span></div>
     <div class="chip"><span class="k">Streak</span><span class="v" id="hStreak">0 wk</span></div>
     </div>
 
@@ -340,7 +341,7 @@ const BUILD=[
  {at:400,id:"farms",name:"Farmsteads",d:"Cottages, chimneys and fields. Settlers arrive."},
  {at:800,id:"ward",name:"Sacred Wind Barrier",d:"A ring of living wind guards the realm."},
  {at:1250,id:"harbor",name:"Harbor & Fishing Boats",d:"Lanterns bob on the lake."},
- {at:2500,id:"walls",name:"Great Walls & Knights",d:"Towers, gold banners, an armored guard."},
+ {at:500,id:"walls",name:"Great Walls & Knights",d:"Towers, gold banners, an armored guard."},
  {at:4000,id:"mage",name:"Mage Tower",d:"An orb of starlight crowns the spire."},
  {at:75000,id:"castle",name:"Grand Castle",d:"The keep rises into a true castle."},
  {at:15000,id:"light",name:"Lighthouse & War Fleet",d:"A beam sweeps the lake. Warships anchor."},
@@ -352,7 +353,7 @@ const BUILD=[
  {at:1000000,id:"legend",name:"Mythic Throne",d:"A golden throne above the clouds. You built a legend."},
 ];
 const CRE=[
- {id:"dragon",species:"Emberwing Dragon",type:"drake",egg:500,stages:[
+ {id:"dragon",species:"Emberwing Dragon",type:"drake",egg:500,habitWk:26,stages:[
    [1000,"Wyrmling","Hatches from the egg. Rarity revealed."],[1500,"Flamebreath","Learns to breathe fire."],
    [2000,"Armored Scales","Grows plated armor along its spine."],[3000,"Crown of Horns","Its horns sweep into a crown."],
    [4500,"Adult","Grows to full size."],[6500,"Elder","A burning aura surrounds it."],[8500,"Ascended","Grows a second pair of wings."]]},
@@ -365,8 +366,11 @@ const CRE=[
    [50000,"Awakens","Uncoils across the night sky. Rarity revealed."],[75000,"Star-Swallower","Grows vast enough to swallow stars."]]},
  {id:"titan",species:"World Titan",type:"titan",stages:[[100000,"Awakens","The mountains stand up. Rarity revealed."]]},
 ];
+// Habit weeks: a week with at least $5 saved counts once, however much you saved that week.
+// Each building can unlock by balance (at) OR by habit (wk), so steady small savers keep progressing.
+const HABIT={scouts:1,palisade:2,tower:4,farms:6,stonehouse:10,harbor:8,walls:12,manor:20,mage:16};
 const MIL=[];
-BUILD.forEach(b=>MIL.push({at:b.at,id:"b:"+b.id,name:b.name,d:b.d}));
+BUILD.forEach(b=>MIL.push({at:b.at,wk:HABIT[b.id],id:"b:"+b.id,name:b.name,d:b.d}));
 CRE.forEach(c=>{
   if(c.egg)MIL.push({at:c.egg,id:c.id+":egg",name:c.species+" Egg",d:"A glowing egg appears in a nest by the keep.",big:true,tag:"Creature"});
   c.stages.forEach((s,i)=>MIL.push({at:s[0],id:c.id+":"+i,name:i?c.species.split(" ")[0]+" · "+s[1]:c.species,d:s[2],big:i===0,tag:i?"Upgrade":"Creature"}));
@@ -398,6 +402,11 @@ function compute(){
   return {bal:r2(bal),life:r2(life),peak,streak};
 }
 function weekOf(t){return Math.floor((Math.floor(t/864e5)+3)/7)}
+function habitWeeks(){
+  const w={};data.entries.forEach(e=>{if(e.kind==="deposit"){const k=weekOf(e.t);w[k]=(w[k]||0)+Math.round(e.amt*100)}});
+  return Object.values(w).filter(c=>c>=500).length;
+}
+const creatureUnlocked=(c,bal,hw)=>stageOf(c,bal)>=1||!!(c.habitWk&&hw>=c.habitWk);
 const stageOf=(c,bal)=>c.stages.filter(s=>bal>=s[0]).length;
 
 /* rarity roll — once per creature, ever */
@@ -1304,26 +1313,28 @@ let showAll=false;
 function render(initial){
   welcomeBack();
   const {bal,life,peak,streak}=compute();
-  const ids=new Set(MIL.filter(m=>bal>=m.at).map(m=>m.id));
+  const hw=habitWeeks();
+  const ids=new Set(MIL.filter(m=>bal>=m.at||(m.wk&&hw>=m.wk)).map(m=>m.id));
   state.bal=bal;state.ids=ids;state.cre={};
-  if(loaded){CRE.forEach(c=>{if(stageOf(c,bal)>=1&&!data.cre[c.id])claimCreature(c.id)})}
-  CRE.forEach(c=>{const k=stageOf(c,bal);state.cre[c.id]=data.cre[c.id]?k:0});
+  if(loaded){CRE.forEach(c=>{if(!data.cre[c.id]&&creatureUnlocked(c,bal,hw))claimCreature(c.id)})}
+  CRE.forEach(c=>{const k=Math.max(stageOf(c,bal),creatureUnlocked(c,bal,hw)?1:0);state.cre[c.id]=data.cre[c.id]?k:0});
   const RANK={common:0,rare:1,epic:2,legendary:3,mythic:4};
   state.scene=new Set(CRE.filter(c=>state.cre[c.id]>0)
     .sort((a,b)=>(RANK[data.cre[b.id].rarity]-RANK[data.cre[a.id].rarity])||(state.cre[b.id]-state.cre[a.id]))
     .slice(0,2).map(c=>c.id));
   $("hBal").textContent=fmt(bal);$("hArmy").textContent=Math.floor(bal/5).toLocaleString();$("hLife").textContent=fmt(life);
+  $("hHabit").textContent=hw+(hw===1?" week":" weeks");
   $("hStreak").textContent=streak+" wk"+(streak?" · +"+Math.min(8,streak)*10+"% luck":"");
-  const nx=MIL.find(m=>m.at>bal);
+  const nx=MIL.find(m=>!ids.has(m.id));
   if(nx){const prev=[...MIL].reverse().find(m=>m.at<=bal)?.at||0,pct=Math.min(100,(bal-prev)/(nx.at-prev)*100);
-    $("next").innerHTML=`<span class="label">Next unlock${nx.tag?" · "+nx.tag:""}</span><span class="name"></span><div class="bar"><i style="width:${pct}%"></i></div><span class="togo"><strong>${fmt(r2(nx.at-bal))}</strong> <span>to go · unlocks at ${fmt(nx.at)}</span></span>`;
+    $("next").innerHTML=`<span class="label">Next unlock${nx.tag?" · "+nx.tag:""}</span><span class="name"></span><div class="bar"><i style="width:${pct}%"></i></div><span class="togo"><strong>${fmt(r2(nx.at-bal))}</strong> <span>to go · unlocks at ${fmt(nx.at)}${nx.wk&&hw<nx.wk?" · or "+(nx.wk-hw)+" more "+(nx.wk-hw===1?"week":"weeks"):""}</span></span>`;
     $("next").querySelector(".name").textContent=nx.name}
   else $("next").innerHTML=`<span class="label">Every unlock claimed</span><span class="name">The world bows to you.</span>`;
   const road=$("road");road.innerHTML="";
-  const ci=MIL.findIndex(m=>m.at>bal);const cur=ci<0?MIL.length:ci;
+  const ci=MIL.findIndex(m=>!ids.has(m.id));const cur=ci<0?MIL.length:ci;
   const list=showAll?MIL:MIL.slice(Math.max(0,cur-2),cur+5);
-  list.forEach(m=>{const li=document.createElement("li");li.className=(bal>=m.at?"have":peak>=m.at?"lost":"locked")+(m.big?" big":"");
-    li.innerHTML=`<span class="at">${fmt(m.at)}</span><div><div class="t"></div><div class="d"></div></div>`;
+  list.forEach(m=>{const li=document.createElement("li");li.className=(ids.has(m.id)?"have":peak>=m.at?"lost":"locked")+(m.big?" big":"");
+    li.innerHTML=`<span class="at">${fmt(m.at)}${m.wk?"<br>or "+m.wk+" wk"+(m.wk===1?"":"s"):""}</span><div><div class="t"></div><div class="d"></div></div>`;
     li.querySelector(".t").textContent=m.name;if(m.tag){const s=document.createElement("span");s.className="tag";s.textContent=m.tag;li.querySelector(".t").appendChild(s)}
     li.querySelector(".d").textContent=m.d;road.appendChild(li)});
   $("roadToggle").textContent=showAll?"Show what's next":"Show the full road ("+MIL.length+" unlocks)";
