@@ -17,6 +17,7 @@ Last updated: 2026-10-22. Source of truth is this repo (`main`). Live site: http
 - **First-run welcome card** on the Kingdom tab, dismissed with "Got it" and remembered on that device.
 
 ## Written but NOT yet run in Supabase
+- `supabase/projects.sql`: the weekly project choice (Orchard, Watchtower, Well). Story only: it never changes money, rarity or rewards. Run after `goals.sql`. Until it runs, the project buttons show but cannot save.
 - `supabase/goals.sql`: **savings places** (nest egg, emergency fund, car, house, custom). Goals are allocations of your treasury filled in order; no money moves. Run after `audit.sql`. Until it runs, the places section stays empty and the rest of the app still works.
 - `supabase/audit.sql`: audit trail for every deposit/withdrawal change, and `delete_my_data()` used by **Erase my data**. **Until this runs, Erase my data will show an error and nothing is deleted.** Run it after `habit.sql`.
 
@@ -28,6 +29,7 @@ Last updated: 2026-10-22. Source of truth is this repo (`main`). Live site: http
 5. `supabase/habit.sql`
 6. `supabase/audit.sql`
 7. `supabase/goals.sql`
+8. `supabase/projects.sql`
 
 ## Tested
 - **SQL rule tests** (`tests/sql/run.sh`, `tests/sql/10_rules.sql`): exact cents balance, habit-week counting, starter pet idempotence, quest gating, creature rolls once, dragon by habit, phoenix refused at low balance, direct writes blocked on creatures/pets/profiles, pacts refuse strangers, audit trail present and append-only, cross-user isolation, erasure removes one player's data and not another's. Verified that a deliberately false assertion makes the run exit non-zero.
@@ -83,5 +85,5 @@ Why these choices, and what to watch so the app motivates without manipulating:
 - **Guilt backfires.** Streak-loss messages can push people to quit after one miss. The daily lamp is deliberately non-punitive: dark means "not yet today", never "you failed".
 - **Shown, not shamed.** A withdrawal is logged as a plain line in the chronicle, with no judgement.
 
-Built from these notes: savings places (cards and plots in the scene, up to four), the chronicle, and the daily lamp.
-Still to build from the list: creature backstories, choices about what the kingdom works on next, and a stone-loss view for withdrawals. Scene plots are small (about 12 pixels) and sit at the edges; they need a real-phone look before we tune them.
+Built from these notes: savings places (cards and plots in the scene, up to four), the chronicle, the daily lamp, creature backstories (unlock as creatures grow), weekly project choices, and a withdrawal note on each place that lost ground.
+Not built yet: a visual stone loss in the scene (the note is text only), and project effects in the scene. Projects are story-only by design. Scene plots are small (about 12 pixels) and sit at the edges; they need a real-phone look before we tune them.

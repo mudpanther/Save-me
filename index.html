@@ -49,7 +49,8 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,6vw,2.8rem);l
 .toast b{font-family:var(--display);font-size:1.35rem;font-weight:700;display:block;color:var(--gold);line-height:1.15}
 .toast.loss b{color:var(--ember)}
 .reveal{position:absolute;inset:0;background:rgba(5,6,14,.86);display:flex;align-items:center;justify-content:center;padding:16px}
-.reveal .card{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;max-width:420px}
+#detCv{width:min(180px,50vw)!important}
+.reveal .card{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;max-width:420px;max-height:calc(100% - 8px);overflow:auto}
 .reveal canvas{width:min(320px,80vw);height:auto;aspect-ratio:5/3;image-rendering:pixelated}
 .reveal .rar{font-family:var(--pixel);font-weight:700;font-size:1.6rem;letter-spacing:.18em}
 .reveal .nm{font-family:var(--display);font-size:2rem;line-height:1;color:var(--ink)}
@@ -185,6 +186,15 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .goalrow{display:flex;gap:8px}
 .goalrow input,.goalrow select,.goalrow button{flex:1;min-width:0}
 .chron-wrap{display:flex;flex-direction:column;gap:10px}
+.place-loss{margin:0;font-size:.85rem;color:var(--ember)}
+.projbox{display:flex;flex-direction:column;gap:8px}
+.projrow{display:flex;gap:8px;flex-wrap:wrap}
+.proj{flex:1 1 30%;min-width:0;text-align:left;display:flex;flex-direction:column;gap:4px;padding:10px;font-size:.8rem}
+.proj strong{font-size:.9rem}
+.proj span{color:var(--muted);font-weight:400;line-height:1.35}
+.lore{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.88rem;color:var(--ink);line-height:1.45;text-align:left}
+.lore li{padding-left:10px;border-left:2px solid var(--gold)}
+.lore li.locked{color:var(--muted);border-left-color:var(--line);font-style:italic}
 .lamp{font-size:.9rem;color:var(--muted);margin:0;padding:0 4px}
 .lamp.lit{color:var(--gold)}
 .chron{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;border-left:1px solid var(--line);margin-left:6px}
@@ -254,6 +264,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
         <span class="rar" id="detRar"></span>
         <span class="nm" id="detName"></span>
         <span class="sp" id="detSp"></span>
+        <ul class="lore" id="detLore"></ul>
         <button class="dep" id="detOk" style="margin-top:8px;padding:10px 28px">Close</button>
       </div>
     </div>
@@ -304,6 +315,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
   <section class="places-wrap" data-tab="kingdom" aria-label="Your places">
     <p class="steward" id="steward"></p>
     <div class="places" id="places"></div>
+    <div id="projBox" class="projbox"></div>
     <button class="link" id="goalToggle" type="button">+ Add a place</button>
     <form id="goalForm" class="goalform" hidden autocomplete="off">
       <input type="text" id="gName" maxlength="40" placeholder="What is it? e.g. Nest egg, Civic, Down payment" aria-label="Place name">
@@ -553,6 +565,7 @@ async function pull(){
     if(again.error)throw again.error;seed=again.data.seed;
   }
   await loadGoals();
+  await loadProjects();
   const pend=outbox();
   const dels=new Set(pend.filter(o=>o.t==="del").map(o=>o.id));
   const entries=e.data.map(r=>({id:r.id,kind:r.kind,amt:Number(r.amt),note:r.note||"",t:Number(r.t)}));
@@ -1403,6 +1416,18 @@ function glowFor(c,x,y,r,t,force){
   const n=g.p.aura?2:(force?1:.3);
   for(let i=0;i<n;i++)if(Math.random()<n/2){const a=Math.random()*6.28,d=r*(.6+Math.random()*.5);emit(x+Math.cos(a)*d,y+Math.sin(a)*d*.6,0,-.08,40,col)}
 }
+// Backstories unlock as a creature grows: lines 1, 2 and 3 open at growth stages 1, 3 and 5.
+const LORE={
+  dragon:["Found as an egg in the first cold winter. The steward kept it warm.","It grew strong on patience, not luck. Every fire it breathes is earned.","Old keepers say an Emberwing chooses one keeper for life. It chose you."],
+  phoenix:["It was born in a storm that flattened the old mill and nothing else.","It rises each time something is rebuilt, which is why the steward trusts it.","Its song is said to be heard only by people who keep their word."],
+  leviathan:["It lives in the deep lake, where the treasury's first coins sank.","Sailors call it the Keeper of Low Tides. It has never let a harbor run dry.","When it turns, the whole lake shifts. Its wake is a promise, not a threat."],
+  wyrm:["It drifts above the kingdom, older than the first stone of the walls.","Each star it passes is a goal someone once wrote down.","It is what the sky looks like when enough small deposits add up."],
+  titan:["A giant asleep under the mountains. It stirs only when the vault is full.","It carried the first wall stones up the hill, one at a time.","Its steps are slow. It has never rushed, and never once stopped."]
+};
+function loreFor(c,k){
+  const lines=LORE[c.id]||[];
+  return lines.map((text,i)=>({text,open:k>=[1,3,5][i]}));
+}
 function openDetail(h){
   const dc=$("detCv"),now=performance.now();let name,rar,sub;
   if(h.id==="pet"){const p=petList.find(x=>x.id===companionId)||{};
@@ -1411,7 +1436,10 @@ function openDetail(h){
   else{const c=CRE.find(x=>x.id===h.id),k=state.cre[c.id],st=c.stages[Math.max(1,k)-1],nx=c.stages[k];
     const d=data.cre[c.id];rar=d.rarity;name=genes(c).name;
     sub=`${c.species} · ${st?st[1]:""}${nx?" · next stage at "+fmt(nx[0]):" · fully grown"} · rolled ${new Date(d.t).toLocaleDateString()}`;
-    drawPortrait(dc,c,k,now)}
+    drawPortrait(dc,c,k,now);
+    const box=$("detLore");box.innerHTML="";
+    loreFor(c,Math.max(1,k)).forEach(l=>{const li=document.createElement("li");li.className=l.open?"":"locked";li.textContent=l.open?l.text:"Keep growing to learn more.";box.appendChild(li)});
+  }
   $("detRar").textContent=RAR_NAME[rar];$("detRar").className="rar r-"+rar;
   $("detName").textContent=name;$("detSp").textContent=sub;$("detail").hidden=false;
 }
@@ -1519,6 +1547,8 @@ function stewardLine(balDollars,alloc){
 function renderPlaces(balDollars){
   const box=$("places");box.innerHTML="";
   const alloc=allocate(balDollars);
+  const lost=new Set();const imp=lastWithdrawalImpact();
+  if(imp){const was=allocate(imp.before),now=allocate(imp.after);now.forEach((g,i)=>{if(was[i]&&g.got<was[i].got)lost.add(g.id)})}
   $("steward").textContent=stewardLine(balDollars,alloc);
   scenePlaces=alloc.map(g=>({kind:g.kind,done:g.done,stage:g.pct===0?-1:(g.done?3:g.pct>=0.67?2:g.pct>=0.34?1:0)}));
   if(!alloc.length){box.innerHTML='<p class="empty">No places yet. Each one is a real goal, built stone by stone as you save.</p>';return}
@@ -1533,9 +1563,57 @@ function renderPlaces(balDollars){
     card.querySelector(".place-stage").textContent=stage;
     card.querySelector(".bar i").style.width=(g.pct*100).toFixed(1)+"%";
     card.querySelector(".place-foot span").textContent=fmt(r2(g.got/100))+" of "+fmt(r2(g.target/100))+" · "+KIND_NAME[g.kind];
+    if(lost.has(g.id)){const n=document.createElement("p");n.className="place-loss";n.textContent="Lost ground after the last withdrawal. Deposits rebuild it.";card.appendChild(n)}
     card.querySelector("button").addEventListener("click",()=>removeGoal(g.id,g.name));
     box.appendChild(card);
   });
+}
+let projects=[];
+const PROJECTS={
+  orchard:{name:"The Orchard",line:"The steward plants apple trees by the lake."},
+  watchtower:{name:"The Watchtower",line:"A lookout goes up on the western wall."},
+  well:{name:"The Well",line:"Clean water is dug for the town square."}
+};
+async function loadProjects(){
+  // Separate from pull() so the app still loads before projects.sql is run.
+  const r=await sb.from("kingdom_projects").select("week_key,project,chosen_at");
+  if(r.error)return;
+  projects=(r.data||[]).map(x=>({week:x.week_key,project:x.project,t:Date.parse(x.chosen_at)||0}));
+}
+function thisWeekProject(){return projects.find(p=>p.week===weekOf(Date.now()))}
+function renderProject(){
+  const box=$("projBox");box.innerHTML="";
+  const cur=thisWeekProject();
+  if(cur){
+    const p=document.createElement("p");p.className="steward";
+    p.textContent="This week the steward is building "+PROJECTS[cur.project].name+". "+PROJECTS[cur.project].line;
+    box.appendChild(p);return;
+  }
+  const h=document.createElement("p");h.className="hint";h.textContent="Choose this week's project. It is a story choice only: it never changes your money.";
+  box.appendChild(h);
+  const row=document.createElement("div");row.className="projrow";
+  Object.entries(PROJECTS).forEach(([key,pr])=>{
+    const b=document.createElement("button");b.type="button";b.className="proj";
+    b.innerHTML='<strong></strong><span></span>';
+    b.querySelector("strong").textContent=pr.name;b.querySelector("span").textContent=pr.line;
+    b.addEventListener("click",()=>chooseProject(key));row.appendChild(b);
+  });
+  box.appendChild(row);
+}
+async function chooseProject(key){
+  const {error}=await sb.from("kingdom_projects").insert({week_key:weekOf(Date.now()),project:key});
+  if(error){showGoalMsg("Couldn't record that choice. Check your connection.");return}
+  await loadProjects();renderProject();renderChronicle();
+}
+// Balance before and after the most recent withdrawal, to show what it cost each place.
+function lastWithdrawalImpact(){
+  const list=[...data.entries].sort((a,b)=>a.t-b.t);
+  let idx=-1;list.forEach((e,i)=>{if(e.kind==="withdraw")idx=i});
+  if(idx<0)return null;
+  let bal=0;for(let i=0;i<idx;i++){const e=list[i],a=Math.round(e.amt*100);
+    if(e.kind==="deposit")bal+=a;else if(e.kind==="withdraw")bal=Math.max(0,bal-a);else bal=a}
+  const before=bal/100;const e=list[idx];const after=Math.max(0,before-e.amt);
+  return {t:e.t,before,after};
 }
 function chronicleLines(){
   const list=[...data.entries].sort((a,b)=>a.t-b.t);
@@ -1562,6 +1640,7 @@ function chronicleLines(){
         out.push({t:e.t,when,text:g.name+" is finished. Its walls stand.",milestone:true})}
     }
   }
+  projects.forEach(p=>out.push({t:p.t,when:new Date(p.t).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),text:PROJECTS[p.project].name+" begun. "+PROJECTS[p.project].line,milestone:false}));
   return out.sort((x,y)=>y.t-x.t);
 }
 function renderChronicle(){
@@ -1619,6 +1698,7 @@ function render(initial){
     .sort((a,b)=>(RANK[data.cre[b.id].rarity]-RANK[data.cre[a.id].rarity])||(state.cre[b.id]-state.cre[a.id]))
     .slice(0,2).map(c=>c.id));
   renderPlaces(bal);
+  renderProject();
   renderChronicle();
   $("hBal").textContent=fmt(bal);$("hArmy").textContent=Math.floor(bal/5).toLocaleString();$("hLife").textContent=fmt(life);
   $("hHabit").textContent=hw+(hw===1?" week":" weeks");

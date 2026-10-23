@@ -27,7 +27,9 @@ A pixel-art fantasy kingdom that grows with your real savings. Log deposits and 
    5. `supabase/habit.sql`
    6. `supabase/audit.sql`
 7. `supabase/goals.sql`
+8. `supabase/projects.sql`
    7. `supabase/goals.sql`
+   8. `supabase/projects.sql`
 4. Open **Authentication → Sign In / Providers** and make sure **Email** is turned on (it is by default).
    - Easiest option: turn **Confirm email** off. People can sign up and start playing right away.
    - If you leave it on, new players get a confirmation email first. In that case also do step 3 of Part 3 below.
@@ -97,6 +99,7 @@ When you change any file, also open `sw.js` and bump the version (for example `s
 | `supabase/pacts.sql` | Accountability pacts between friends |
 | `supabase/habit.sql` | Habit weeks, the starter pet, and habit-based unlocks |
 | `supabase/audit.sql` | Audit trail for deposits and withdrawals, and erase-my-data |
+| `supabase/projects.sql` | The kingdom's weekly project choice (story only, no money effect); erase-my-data includes it |
 | `supabase/goals.sql` | Savings places (goals), filled in order from your treasury; erase-my-data includes them |
 | `tests/sql/` | Database rule tests, run in CI and locally with `tests/sql/run.sh` |
 | `PRIVACY.md` | Privacy notice draft (needs qualified legal review) |
