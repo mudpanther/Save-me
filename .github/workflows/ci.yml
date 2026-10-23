@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: savemetest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: JavaScript syntax check (app script, service worker, config)
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          s = pathlib.Path("index.html").read_text(encoding="utf-8")
+          blocks = re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', s, re.S)
+          pathlib.Path("app-inline.js").write_text("\n".join(blocks), encoding="utf-8")
+          PY
+          node --check app-inline.js
+          node --check sw.js
+          node --check config.js
+
+      - name: Load every SQL file in order and run the rule tests
+        run: tests/sql/run.sh

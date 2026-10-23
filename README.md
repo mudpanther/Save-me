@@ -19,10 +19,13 @@ A pixel-art fantasy kingdom that grows with your real savings. Log deposits and 
 
 1. Go to [supabase.com](https://supabase.com), sign up, and click **New project**.
 2. Name it `save-me`, set a database password (save it somewhere), pick the region closest to you (East US), and create it. It takes a minute or two to start.
-3. In the left sidebar open **SQL Editor**, then run these three files one at a time, in this order. For each: click **New query** (or **Raw** on GitHub to copy the file), paste it in, and click **Run**. Warnings about "destructive operations" are expected, since the files replace older policies.
+3. In the left sidebar open **SQL Editor**, then run these six files one at a time, in this order. For each: click **New query** (or **Raw** on GitHub to copy the file), paste it in, and click **Run**. Warnings about "destructive operations" are expected, since the files replace older policies.
    1. `supabase/schema.sql`
    2. `supabase/friends.sql`
    3. `supabase/quests.sql`
+   4. `supabase/pacts.sql`
+   5. `supabase/habit.sql`
+   6. `supabase/audit.sql`
 4. Open **Authentication → Sign In / Providers** and make sure **Email** is turned on (it is by default).
    - Easiest option: turn **Confirm email** off. People can sign up and start playing right away.
    - If you leave it on, new players get a confirmation email first. In that case also do step 3 of Part 3 below.
@@ -89,3 +92,20 @@ When you change any file, also open `sw.js` and bump the version (for example `s
 | `supabase/schema.sql` | Database tables and privacy rules |
 | `supabase/friends.sql` | Friends, friend codes and the leaderboard |
 | `supabase/quests.sql` | Eggs, pets, weekly quests, companions, and the server-side rolls |
+| `supabase/pacts.sql` | Accountability pacts between friends |
+| `supabase/habit.sql` | Habit weeks, the starter pet, and habit-based unlocks |
+| `supabase/audit.sql` | Audit trail for deposits and withdrawals, and erase-my-data |
+| `tests/sql/` | Database rule tests, run in CI and locally with `tests/sql/run.sh` |
+| `PRIVACY.md` | Privacy notice draft (needs qualified legal review) |
+| `PROGRESS.md` | What is finished, what is tested, and what is still open |
+
+## Testing
+
+- **Database rules:** `tests/sql/run.sh` builds a fresh Postgres 16 database, loads every SQL file in order, and runs `tests/sql/10_rules.sql`. The run stops with a non-zero exit code on the first failed assertion. CI runs it on every push.
+- **Browser script:** CI checks that the app's JavaScript parses. Screen-level checks were run by hand in a headless browser; they are not automated yet.
+- The test stub in `tests/sql/00_stub.sql` stands in for Supabase's login system. It is never loaded into a real project.
+
+## Your data
+
+Players can download everything Save Me stores for them, or erase it, from the **History → Your data** section. See `PRIVACY.md` for the draft notice.
+

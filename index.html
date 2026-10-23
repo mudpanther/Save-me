@@ -191,6 +191,11 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .pact{display:flex;flex-direction:column;gap:8px;background:var(--panel-2);border-radius:10px;padding:12px}
 .pactline{font-family:var(--body);color:var(--ink);margin:0}
 .pactrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.btns2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.welcome{gap:10px}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.steps b{color:var(--gold)}
+#monthly table{width:100%}
 </style>
 </head>
 <body>
@@ -235,6 +240,16 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     </div>
   </section>
 
+  <section class="panel welcome" id="welcomeCard" data-tab="kingdom" hidden>
+    <h2>Welcome to Save Me</h2>
+    <ol class="steps">
+      <li><b>Set your starting balance.</b> Tap <i>Set balance</i> and enter what's in your savings account today.</li>
+      <li><b>Log each deposit</b> as you make it. Your kingdom grows with real saving.</li>
+      <li><b>Meet your starter pet.</b> It flies over your kingdom and keeps you company.</li>
+    </ol>
+    <p class="hint">Save Me only tracks your balance. It never moves or holds your money.</p>
+    <button type="button" class="dep" id="welcomeOk">Got it</button>
+  </section>
   <div data-tab="kingdom" style="display:flex;flex-direction:column;gap:18px">
     <section class="panel">
       <h2>The Treasury</h2>
@@ -304,8 +319,22 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
   </section>
 
   <section class="panel" data-tab="history">
+    <h2>Monthly summary</h2>
+    <p class="hint">What you put in and took out each month, in your own records. Not a bank statement.</p>
+    <div class="scroll" id="monthly"></div>
+  </section>
+  <section class="panel" data-tab="history">
     <h2>Royal Ledger</h2>
     <div class="scroll"><table id="ledger"></table></div>
+  </section>
+  <section class="panel" data-tab="history">
+    <h2>Your data</h2>
+    <p class="hint">Download a copy of everything Save Me holds for you, or erase it. Your real money is in your bank and is never affected by either.</p>
+    <div class="btns2">
+      <button type="button" id="exportBtn">Download my data</button>
+      <button type="button" class="wd" id="eraseBtn">Erase my data</button>
+    </div>
+    <p class="err" id="dataMsg" hidden></p>
   </section>
   <div class="foot"><span>Signed in as <span id="who"></span></span><button id="signOut" class="link">Sign out</button></div>
 </div>
@@ -524,6 +553,65 @@ $("authForm").addEventListener("submit",e=>{e.preventDefault();doAuth(authMode)}
 $("btnIn").addEventListener("click",()=>authMode="in");
 $("btnUp").addEventListener("click",()=>authMode="up");
 $("signOut").addEventListener("click",async()=>{if(sb)await sb.auth.signOut();uid=null;location.reload()});
+
+/* ---------- monthly summary (History) ---------- */
+function monthlySummary(){
+  const list=[...data.entries].sort((a,b)=>a.t-b.t);
+  const months={};let bal=0;
+  for(const e of list){
+    const d=new Date(e.t),k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    const m=months[k]||(months[k]={dep:0,wd:0,n:0,end:0});
+    const a=cents(e.amt);
+    if(e.kind==="deposit"){bal+=a;m.dep+=a}
+    else if(e.kind==="withdraw"){const take=Math.min(a,bal);bal-=take;m.wd+=take}
+    else bal=a;
+    m.n++;m.end=bal;
+  }
+  return Object.entries(months).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,12);
+}
+function renderMonthly(){
+  const box=$("monthly");box.innerHTML="";const rows=monthlySummary();
+  if(!rows.length){box.innerHTML='<p class="empty">Your monthly summary appears after your first entry.</p>';return}
+  const tb=document.createElement("table");
+  tb.innerHTML='<tr><th>Month</th><th style="text-align:right">Saved</th><th style="text-align:right">Withdrawn</th><th style="text-align:right">Balance at end</th></tr>';
+  rows.forEach(([k,m])=>{const [y,mo]=k.split("-");
+    const tr=document.createElement("tr");
+    const label=new Date(+y,+mo-1,1).toLocaleDateString("en-US",{month:"short",year:"numeric"});
+    tr.innerHTML=`<td></td><td class="n plus">${m.dep?"+"+fmt(m.dep/100):"—"}</td><td class="n minus">${m.wd?"−"+fmt(m.wd/100):"—"}</td><td class="n"></td>`;
+    tr.children[0].textContent=label;tr.children[3].textContent=fmt(m.end/100);tb.appendChild(tr)});
+  box.appendChild(tb);
+}
+
+/* ---------- download and erase your data ---------- */
+async function exportData(){
+  if(!sb||!uid){flashIn("dataMsg","Sign in to download your data.",true);return}
+  flashIn("dataMsg","Preparing your download…");
+  const tables=["profiles","kingdoms","entries","entries_audit","pets","creatures","pacts"];
+  const out={app:"Save Me",exported_at:new Date().toISOString(),
+    note:"These are your own records of your balances. Save Me only tracks them; it does not hold or move money.",data:{}};
+  try{
+    for(const t of tables){const {data:rows,error}=await sb.from(t).select("*");if(error)throw error;out.data[t]=rows||[]}
+  }catch(e){flashIn("dataMsg","Couldn't prepare the download. Check your connection and try again.",true);return}
+  const url=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:"application/json"}));
+  const a=document.createElement("a");a.href=url;a.download="save-me-export-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  flashIn("dataMsg","Download ready.");
+}
+async function eraseData(){
+  if(!sb||!uid){flashIn("dataMsg","Sign in first.",true);return}
+  if(!confirm("Erase all of your Save Me data? This deletes your deposits, creatures, pets, friends and pacts, and their history. It cannot be undone. Your bank account is not affected."))return;
+  if(!confirm("Last check: have you downloaded a copy you want to keep?"))return;
+  const {error}=await sb.rpc("delete_my_data");
+  if(error){flashIn("dataMsg","Couldn't erase your data. Nothing was deleted. Try again.",true);return}
+  try{Object.keys(localStorage).filter(k=>k.startsWith("saveme:")).forEach(k=>localStorage.removeItem(k))}catch(e){}
+  await sb.auth.signOut();location.reload();
+}
+$("exportBtn").addEventListener("click",exportData);
+$("eraseBtn").addEventListener("click",eraseData);
+
+/* ---------- first-run welcome card ---------- */
+function welcomeSeen(){try{return localStorage.getItem(LS("onboarded"))==="1"}catch(e){return false}}
+$("welcomeOk").addEventListener("click",()=>{try{localStorage.setItem(LS("onboarded"),"1")}catch(e){}$("welcomeCard").hidden=true});
 
 async function boot(){
   if(!sb){$("auth").hidden=false;$("authForm").hidden=true;authMsg("Almost there: open config.js and paste in your Supabase project URL and anon key. The setup guide in README.md walks through it.",true);setSync("Not connected");return}
@@ -1347,6 +1435,8 @@ function render(initial){
       const cls=e.kind==="deposit"?"plus":e.kind==="withdraw"?"minus":"set",sign=e.kind==="deposit"?"+":e.kind==="withdraw"?"−":"= ";
       tr.innerHTML=`<td>${new Date(e.t).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</td><td>${e.kind==="set"?"Balance set":e.kind[0].toUpperCase()+e.kind.slice(1)}</td><td class="note"></td><td class="n ${cls}">${sign}${fmt(e.amt)}</td><td><button class="x" aria-label="Remove entry" data-id="${e.id}">✕</button></td>`;
       tr.querySelector(".note").textContent=e.note||"";L.appendChild(tr)})}
+  renderMonthly();
+  $("welcomeCard").hidden=data.entries.length>0||welcomeSeen();
   buildBeasts();
   if(!initial&&lastUnlocked){const gained=MIL.filter(m=>ids.has(m.id)&&!lastUnlocked.has(m.id)),lost=MIL.filter(m=>!ids.has(m.id)&&lastUnlocked.has(m.id));
     if(gained.length)toast(false,gained[gained.length-1],gained.length);else if(lost.length)toast(true,lost[lost.length-1],lost.length,bal)}
