@@ -164,6 +164,11 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .traits span.pill.r-legendary{color:var(--legendary)}
 .traits span.pill.r-mythic{background:linear-gradient(90deg,#ff7ad9,#8fd3ff,#ffe27a,#ff7ad9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;border-color:var(--mythic)}
 .qlist{display:flex;flex-direction:column;gap:8px}
+.petbar{display:flex;flex-direction:column;gap:6px;margin:-6px 0 0}
+.petbar-h{font-family:var(--body);font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.petlist{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.petlist .prow{flex:none;flex-direction:row;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;white-space:nowrap}
+.petlist .empty{margin:0;font-size:13px}
 .qrow,.erow,.prow{background:var(--panel-2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .qrow{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
 .qt{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -250,6 +255,10 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <p class="hint">Save Me only tracks your balance. It never moves or holds your money.</p>
     <button type="button" class="dep" id="welcomeOk">Got it</button>
   </section>
+  <div class="petbar" data-tab="kingdom" aria-label="Fly with me">
+    <span class="petbar-h">Fly with me</span>
+    <div id="petsList" class="petlist"></div>
+  </div>
   <div data-tab="kingdom" style="display:flex;flex-direction:column;gap:18px">
     <section class="panel">
       <h2>The Treasury</h2>
@@ -272,12 +281,6 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
     <h2>Your Creatures</h2>
     <p class="sub">Each creature is one of a kind. Its rarity is rolled the first time it joins you.</p>
     <div class="beasts" id="beasts"></div>
-  </section>
-
-  <section class="panel" data-tab="kingdom">
-    <h2>Fly with me</h2>
-    <p class="hint">Pick one to fly over your kingdom. Shinies are rare and shimmer gold.</p>
-    <div id="petsList" class="qlist"></div>
   </section>
 
   <div data-tab="kingdom">
