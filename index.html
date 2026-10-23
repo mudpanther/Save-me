@@ -169,6 +169,21 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .petlist{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .petlist .prow{flex:none;flex-direction:row;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;white-space:nowrap}
 .petlist .empty{margin:0;font-size:13px}
+.places-wrap{display:flex;flex-direction:column;gap:12px}
+.steward{font-family:var(--display);font-style:italic;font-size:1.05rem;color:var(--ink);margin:0;line-height:1.45;padding:0 4px;border-left:2px solid var(--gold);padding-left:12px}
+.places{display:flex;flex-direction:column;gap:10px}
+.place{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.place.done{border-color:var(--gold)}
+.place-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.place-name{font-family:var(--display);font-size:1.1rem;color:var(--ink);margin:0}
+.place-stage{font-size:.85rem;color:var(--muted);margin:0}
+.place.done .place-stage{color:var(--gold)}
+.place-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.82rem;color:var(--muted)}
+.place-foot button{padding:4px 8px;font-size:.8rem;font-weight:500}
+.goalform{display:flex;flex-direction:column;gap:10px;background:var(--panel-2);border-radius:12px;padding:12px}
+.goalform select{background:var(--night);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;padding:9px 10px;flex:1;min-width:0}
+.goalrow{display:flex;gap:8px}
+.goalrow input,.goalrow select,.goalrow button{flex:1;min-width:0}
 .qrow,.erow,.prow{background:var(--panel-2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .qrow{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
 .qt{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -276,6 +291,30 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
       <div class="next" id="next"></div>
     </section>
   </div>
+
+  <section class="places-wrap" data-tab="kingdom" aria-label="Your places">
+    <p class="steward" id="steward"></p>
+    <div class="places" id="places"></div>
+    <button class="link" id="goalToggle" type="button">+ Add a place</button>
+    <form id="goalForm" class="goalform" hidden autocomplete="off">
+      <input type="text" id="gName" maxlength="40" placeholder="What is it? e.g. Nest egg, Civic, Down payment" aria-label="Place name">
+      <div class="goalrow">
+        <select id="gKind" aria-label="Kind of place">
+          <option value="nest">Nest egg</option>
+          <option value="emergency">Emergency fund</option>
+          <option value="car">Car</option>
+          <option value="house">House</option>
+          <option value="other">Something else</option>
+        </select>
+        <input type="text" id="gTarget" inputmode="decimal" placeholder="Target $" aria-label="Target amount">
+      </div>
+      <div class="goalrow">
+        <button type="submit" class="dep">Build it</button>
+        <button type="button" id="goalCancel">Cancel</button>
+      </div>
+      <p class="err" id="goalMsg" hidden></p>
+    </form>
+  </section>
 
   <section data-tab="kingdom" style="display:flex;flex-direction:column;gap:10px">
     <h2>Your Creatures</h2>
@@ -497,6 +536,7 @@ async function pull(){
     const again=await sb.from("kingdoms").select("seed").eq("user_id",uid).single();
     if(again.error)throw again.error;seed=again.data.seed;
   }
+  await loadGoals();
   const pend=outbox();
   const dels=new Set(pend.filter(o=>o.t==="del").map(o=>o.id));
   const entries=e.data.map(r=>({id:r.id,kind:r.kind,amt:Number(r.amt),note:r.note||"",t:Number(r.t)}));
@@ -1406,6 +1446,83 @@ function drawPortraits(t){portraits.forEach(p=>p.egg?eggPortrait(p.cvs,t):drawPo
 
 /* =================== UI =================== */
 let showAll=false;
+let goals=[];
+const PLACE_STAGES={
+  nest:["Foundation dug","Nest lined","Warm and full","Your eggs are safe"],
+  emergency:["Walls raised","Shelter bolted down","Stocked for bad weeks","Ready for the storm"],
+  car:["Parts laid out","Frame on","Wheels on","Ready to roll"],
+  house:["Foundation laid","Walls going up","Roof on","Your door is open"],
+  other:["Foundation laid","Walls going up","Roof on","Finished"]
+};
+const KIND_NAME={nest:"Nest egg",emergency:"Emergency fund",car:"Car",house:"House",other:"Place"};
+async function loadGoals(){
+  // Kept separate from pull() so the app still loads if goals.sql has not been run yet.
+  const g=await sb.from("goals").select("id,name,kind,target,position").order("position");
+  if(g.error)return;
+  goals=(g.data||[]).map(r=>({id:r.id,name:r.name,kind:r.kind,target:Math.round(Number(r.target)*100),position:r.position}));
+}
+function allocate(balDollars){
+  let rem=Math.round(balDollars*100);
+  return goals.map(g=>{const got=Math.min(rem,g.target);rem-=got;return {...g,got,pct:got/g.target,done:got>=g.target}});
+}
+function stewardLine(balDollars,alloc){
+  if(!data.entries.length)return "The steward is waiting. Set your balance so we can begin.";
+  if(!alloc.length)return "Name the first place you are saving for. I will keep the lamps lit.";
+  const wk=weekOf(Date.now());
+  const saved=data.entries.some(e=>e.kind==="deposit"&&weekOf(e.t)===wk);
+  const first=saved?"You saved this week. The steward noticed.":"Nothing saved yet this week. Even a small deposit counts.";
+  const open=alloc.find(g=>!g.done);
+  if(!open)return "Every place is finished. The kingdom is quiet, and proud of you.";
+  const left=fmt(r2((open.target-open.got)/100));
+  return first+" "+open.name+" needs "+left+" more.";
+}
+function renderPlaces(balDollars){
+  const box=$("places");box.innerHTML="";
+  const alloc=allocate(balDollars);
+  $("steward").textContent=stewardLine(balDollars,alloc);
+  if(!alloc.length){box.innerHTML='<p class="empty">No places yet. Each one is a real goal, built stone by stone as you save.</p>';return}
+  alloc.forEach(g=>{
+    const stages=PLACE_STAGES[g.kind]||PLACE_STAGES.other;
+    const idx=g.done?3:g.pct>=0.67?2:g.pct>=0.34?1:0;
+    const stage=g.pct===0?"Waiting for the first stone":stages[idx];
+    const card=document.createElement("div");card.className="place"+(g.done?" done":"");
+    card.innerHTML='<div class="place-top"><p class="place-name"></p></div><p class="place-stage"></p>'
+      +'<div class="bar"><i></i></div><div class="place-foot"><span></span><button type="button" class="link">Remove</button></div>';
+    card.querySelector(".place-name").textContent=g.name;
+    card.querySelector(".place-stage").textContent=stage;
+    card.querySelector(".bar i").style.width=(g.pct*100).toFixed(1)+"%";
+    card.querySelector(".place-foot span").textContent=fmt(r2(g.got/100))+" of "+fmt(r2(g.target/100))+" · "+KIND_NAME[g.kind];
+    card.querySelector("button").addEventListener("click",()=>removeGoal(g.id,g.name));
+    box.appendChild(card);
+  });
+}
+function showGoalMsg(t){const m=$("goalMsg");m.textContent=t;m.hidden=!t}
+async function removeGoal(id,name){
+  if(!confirm("Remove "+name+"? Your money stays in your treasury. Only this place goes.")) return;
+  const {error}=await sb.from("goals").delete().eq("id",id);
+  if(error){showGoalMsg("Couldn't remove that. Try again.");return}
+  await loadGoals();render(false);
+}
+$("goalToggle").addEventListener("click",()=>{
+  const f=$("goalForm");f.hidden=!f.hidden;
+  if(!f.hidden){$("gName").focus()}
+  $("goalToggle").hidden=!f.hidden;
+});
+$("goalCancel").addEventListener("click",()=>{$("goalForm").hidden=true;$("goalToggle").hidden=false;showGoalMsg("")});
+$("goalForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const name=$("gName").value.trim();
+  const kind=$("gKind").value;
+  const target=Number(String($("gTarget").value).replace(/[$,\s]/g,""));
+  if(!name){showGoalMsg("Give the place a name.");return}
+  if(!(target>0)||target>10000000){showGoalMsg("Enter a target between $1 and $10,000,000.");return}
+  if(goals.length>=12){showGoalMsg("You can have up to 12 places. Remove one first.");return}
+  const {error}=await sb.from("goals").insert({name,kind,target:r2(target),position:goals.length+1});
+  if(error){showGoalMsg("Couldn't build that yet. Check your connection and try again.");return}
+  $("gName").value="";$("gTarget").value="";showGoalMsg("");
+  $("goalForm").hidden=true;$("goalToggle").hidden=false;
+  await loadGoals();render(false);
+});
 function render(initial){
   welcomeBack();
   const {bal,life,peak,streak}=compute();
@@ -1418,6 +1535,7 @@ function render(initial){
   state.scene=new Set(CRE.filter(c=>state.cre[c.id]>0)
     .sort((a,b)=>(RANK[data.cre[b.id].rarity]-RANK[data.cre[a.id].rarity])||(state.cre[b.id]-state.cre[a.id]))
     .slice(0,2).map(c=>c.id));
+  renderPlaces(bal);
   $("hBal").textContent=fmt(bal);$("hArmy").textContent=Math.floor(bal/5).toLocaleString();$("hLife").textContent=fmt(life);
   $("hHabit").textContent=hw+(hw===1?" week":" weeks");
   $("hStreak").textContent=streak+" wk"+(streak?" · +"+Math.min(8,streak)*10+"% luck":"");

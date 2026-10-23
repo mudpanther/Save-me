@@ -17,6 +17,7 @@ Last updated: 2026-10-22. Source of truth is this repo (`main`). Live site: http
 - **First-run welcome card** on the Kingdom tab, dismissed with "Got it" and remembered on that device.
 
 ## Written but NOT yet run in Supabase
+- `supabase/goals.sql`: **savings places** (nest egg, emergency fund, car, house, custom). Goals are allocations of your treasury filled in order; no money moves. Run after `audit.sql`. Until it runs, the places section stays empty and the rest of the app still works.
 - `supabase/audit.sql`: audit trail for every deposit/withdrawal change, and `delete_my_data()` used by **Erase my data**. **Until this runs, Erase my data will show an error and nothing is deleted.** Run it after `habit.sql`.
 
 ## Database files (run in Supabase SQL Editor, in this order)
@@ -26,6 +27,7 @@ Last updated: 2026-10-22. Source of truth is this repo (`main`). Live site: http
 4. `supabase/pacts.sql`
 5. `supabase/habit.sql`
 6. `supabase/audit.sql`
+7. `supabase/goals.sql`
 
 ## Tested
 - **SQL rule tests** (`tests/sql/run.sh`, `tests/sql/10_rules.sql`): exact cents balance, habit-week counting, starter pet idempotence, quest gating, creature rolls once, dragon by habit, phoenix refused at low balance, direct writes blocked on creatures/pets/profiles, pacts refuse strangers, audit trail present and append-only, cross-user isolation, erasure removes one player's data and not another's. Verified that a deliberately false assertion makes the run exit non-zero.

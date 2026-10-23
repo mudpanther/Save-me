@@ -95,6 +95,18 @@ select public.t_assert((select count(*) from public.pets) = 0 or
 reset role;
 set role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+-- Savings places: owner-only, capped, no zero targets.
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+insert into public.goals (name, kind, target, position) values ('Nest egg', 'nest', 5000, 1);
+select public.t_assert((select count(*) from public.goals where user_id = auth.uid()) = 1,
+  'Max can add a savings place');
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+select public.t_assert((select count(*) from public.goals where user_id = '11111111-1111-1111-1111-111111111111') = 0,
+  'Brandon cannot see Max''s savings places');
+select public.t_expect_error($q$insert into public.goals (user_id, name, kind, target) values ('11111111-1111-1111-1111-111111111111', 'x', 'car', 100)$q$);
+select public.t_expect_error($q$insert into public.goals (name, kind, target) values ('x', 'car', 0)$q$);
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+
 select delete_my_data();
 reset role;
 select public.t_assert((select count(*) from public.entries where user_id = '11111111-1111-1111-1111-111111111111') = 0,
