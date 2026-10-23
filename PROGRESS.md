@@ -75,3 +75,13 @@ Last updated: 2026-10-22. Source of truth is this repo (`main`). Live site: http
 3. Build the onboarding flow (goal, pace, kingdom name), then multiple goals.
 4. Real-phone test on Android and iPhone, including install and update.
 5. Friend-code rate limiting and an accept step for friend requests.
+
+## Motivation notes (research, Oct 2026)
+Why these choices, and what to watch so the app motivates without manipulating:
+- **Commitment works.** In a Philippines study (J-PAL, SEED accounts), savers who could set a goal and were blocked from withdrawing until they reached it grew balances 42% after six months and 82% after a year. Savings outside the bank did not fall. Save Me cannot lock real money, so this is a future option (for example, a pledge that asks for a confirmation before a withdrawal), not built.
+- **Visible progress helps.** The goal-gradient effect says effort rises as a goal gets closer. The strongest evidence is from animals; human evidence is thinner. Treat progress bars as useful, not proven.
+- **Guilt backfires.** Streak-loss messages can push people to quit after one miss. The daily lamp is deliberately non-punitive: dark means "not yet today", never "you failed".
+- **Shown, not shamed.** A withdrawal is logged as a plain line in the chronicle, with no judgement.
+
+Built from these notes: savings places, the chronicle, and the daily lamp.
+Still to build from the list: places in the pixel scene, creature backstories, choices about what the kingdom works on next, and a stone-loss view for withdrawals.

@@ -184,6 +184,15 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
 .goalform select{background:var(--night);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;padding:9px 10px;flex:1;min-width:0}
 .goalrow{display:flex;gap:8px}
 .goalrow input,.goalrow select,.goalrow button{flex:1;min-width:0}
+.chron-wrap{display:flex;flex-direction:column;gap:10px}
+.lamp{font-size:.9rem;color:var(--muted);margin:0;padding:0 4px}
+.lamp.lit{color:var(--gold)}
+.chron{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;border-left:1px solid var(--line);margin-left:6px}
+.chron li{padding:0 0 12px 14px;position:relative;font-size:.92rem;color:var(--ink);line-height:1.45}
+.chron li::before{content:"";position:absolute;left:-4px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.chron li.milestone::before{background:var(--gold)}
+.chron li.milestone{color:var(--gold)}
+.chron time{display:block;font-size:.76rem;color:var(--muted);margin-bottom:2px}
 .qrow,.erow,.prow{background:var(--panel-2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .qrow{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
 .qt{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -314,6 +323,13 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:.85rem;
       </div>
       <p class="err" id="goalMsg" hidden></p>
     </form>
+  </section>
+
+  <section class="chron-wrap" data-tab="kingdom" aria-label="The chronicle">
+    <h2 class="sub-h">The chronicle</h2>
+    <p class="lamp" id="lamp"></p>
+    <ol class="chron" id="chron"></ol>
+    <p class="hint">Every entry you log becomes a line here. Older ones are in History.</p>
   </section>
 
   <section data-tab="kingdom" style="display:flex;flex-direction:column;gap:10px">
@@ -1496,6 +1512,48 @@ function renderPlaces(balDollars){
     box.appendChild(card);
   });
 }
+function chronicleLines(){
+  const list=[...data.entries].sort((a,b)=>a.t-b.t);
+  const byPos=[...goals].sort((a,b)=>a.position-b.position);
+  const crossed=new Set();
+  let bal=0,firstDeposit=true;const out=[];
+  for(const e of list){
+    const before=bal,a=Math.round(e.amt*100);
+    if(e.kind==="deposit")bal+=a; else if(e.kind==="withdraw")bal=Math.max(0,bal-a); else bal=a;
+    const when=new Date(e.t).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    let text,milestone=false;
+    if(e.kind==="set")text="The treasury was set to "+fmt(r2(bal/100))+".";
+    else if(e.kind==="deposit"){
+      if(firstDeposit){text="The first coin reached the vault.";firstDeposit=false}
+      else if(a>=10000)text="A big deposit: "+fmt(r2(a/100))+" went into the treasury.";
+      else text=fmt(r2(a/100))+" went into the treasury.";
+    } else text=fmt(r2(a/100))+" left the treasury.";
+    if(e.note)text+=" ("+e.note+")";
+    out.push({t:e.t,when,text,milestone});
+    let cum=0;
+    for(const g of byPos){
+      cum+=g.target;
+      if(!crossed.has(g.id)&&bal>=cum&&before<cum){crossed.add(g.id);
+        out.push({t:e.t,when,text:g.name+" is finished. Its walls stand.",milestone:true})}
+    }
+  }
+  return out.sort((x,y)=>y.t-x.t);
+}
+function renderChronicle(){
+  const lamp=$("lamp"),ol=$("chron");
+  const today=new Date().toDateString();
+  const lit=data.entries.some(e=>new Date(e.t).toDateString()===today);
+  lamp.textContent=lit?"Your lamp is lit today. The steward is pleased.":"Your lamp is dark today. Log anything, even a dollar, to light it.";
+  lamp.classList.toggle("lit",lit);
+  ol.innerHTML="";
+  const lines=chronicleLines();
+  if(!lines.length){ol.innerHTML='<li>The chronicle is blank. Your first entry starts it.</li>';return}
+  lines.slice(0,8).forEach(l=>{
+    const li=document.createElement("li");if(l.milestone)li.className="milestone";
+    const tm=document.createElement("time");tm.textContent=l.when;
+    li.appendChild(tm);li.appendChild(document.createTextNode(l.text));ol.appendChild(li);
+  });
+}
 function showGoalMsg(t){const m=$("goalMsg");m.textContent=t;m.hidden=!t}
 async function removeGoal(id,name){
   if(!confirm("Remove "+name+"? Your money stays in your treasury. Only this place goes.")) return;
@@ -1536,6 +1594,7 @@ function render(initial){
     .sort((a,b)=>(RANK[data.cre[b.id].rarity]-RANK[data.cre[a.id].rarity])||(state.cre[b.id]-state.cre[a.id]))
     .slice(0,2).map(c=>c.id));
   renderPlaces(bal);
+  renderChronicle();
   $("hBal").textContent=fmt(bal);$("hArmy").textContent=Math.floor(bal/5).toLocaleString();$("hLife").textContent=fmt(life);
   $("hHabit").textContent=hw+(hw===1?" week":" weeks");
   $("hStreak").textContent=streak+" wk"+(streak?" · +"+Math.min(8,streak)*10+"% luck":"");
