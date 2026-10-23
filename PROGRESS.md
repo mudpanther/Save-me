@@ -83,5 +83,5 @@ Why these choices, and what to watch so the app motivates without manipulating:
 - **Guilt backfires.** Streak-loss messages can push people to quit after one miss. The daily lamp is deliberately non-punitive: dark means "not yet today", never "you failed".
 - **Shown, not shamed.** A withdrawal is logged as a plain line in the chronicle, with no judgement.
 
-Built from these notes: savings places, the chronicle, and the daily lamp.
-Still to build from the list: places in the pixel scene, creature backstories, choices about what the kingdom works on next, and a stone-loss view for withdrawals.
+Built from these notes: savings places (cards and plots in the scene, up to four), the chronicle, and the daily lamp.
+Still to build from the list: creature backstories, choices about what the kingdom works on next, and a stone-loss view for withdrawals. Scene plots are small (about 12 pixels) and sit at the edges; they need a real-phone look before we tune them.

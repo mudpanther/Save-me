@@ -1248,6 +1248,29 @@ function legend(cx,t){
   R(cx-2,B-96,5,5,"#ffe08a");R(cx-1,B-95,3,3,"#fff");
   if(!reduce&&Math.random()<.04)emit(cx+(Math.random()-.5)*20,B-96,(Math.random()-.5)*.1,-.05,60,"#ffe08a");
 }
+// Savings places in the scene: up to four plots at the edges, each built stage by stage.
+const PLOT_X=[8,26,166,184];
+let scenePlaces=[];
+function placeBuilding(x,kind,stage,done,t){
+  if(stage<0){R(x+1,B-2,10,2,"#5a4a3a");R(x+5,B-9,1,7,"#8a6444");R(x+3,B-9,5,2,"#c9a24a");return}
+  if(kind==="car"){
+    R(x,B-5,13,3,"#5a6a8a");R(x+3,B-8,7,3,"#6f80a8");R(x+4,B-7,2,2,"#9fe7ff");R(x+8,B-7,2,2,"#9fe7ff");
+    R(x+1,B-2,3,2,"#14141e");R(x+9,B-2,3,2,"#14141e");
+    if(stage>=2)R(x+3,B-9,7,1,"#3a3a52");
+  } else if(stage===0){
+    bricks(x,B-2,12,2,"#7d7a96","#5f5c78","#9a97b4");
+  } else {
+    const hh=stage>=1?7:0;
+    if(kind==="nest"){b.fillStyle="#c9a24a";circ(b,x+6,B-3,5);R(x+1,B-5,10,2,"#a27a30");R(x+3,B-7,6,1,"#e8c46a")}
+    else if(kind==="emergency"){cone(x+6,B-2,12,6,"#6a5a3a","#4e4226",false);R(x+5,B-3,2,3,"#2a1c12")}
+    else {bricks(x,B-2-hh,12,hh,"#7d7a96","#5f5c78","#9a97b4");R(x+5,B-6,2,4,"#2a1c12")}
+    if(stage>=2)cone(x+6,B-2-(kind==="nest"?7:hh),14,5,"#6b2c3c","#52202f",false);
+  }
+  if(done){R(x+10,B-18,1,10,"#5a5060");R(x+11,B-18,4,3,"#e8b64f");if(!reduce&&Math.floor(t/400)%2)R(x+12,B-18,2,3,"#ffe08a")}
+}
+function drawPlaces(t){
+  scenePlaces.slice(0,PLOT_X.length).forEach((pl,i)=>placeBuilding(PLOT_X[i],pl.kind,pl.stage,pl.done,t));
+}
 function drawKeep(cx,t){
   const castle=has("castle"),palace=has("palace");
   const w=castle?36:30,h=castle?40:34,x0=cx-w/2,y0=B-h;
@@ -1295,6 +1318,7 @@ function frame(t){
     for(const y of [B-40,B-28,B-16])R(mx-1,y,3,4,"#b58cff");
     const pulse=reduce?0:Math.sin(t/300);b.fillStyle="rgba(159,231,255,.15)";circ(b,mx,B-66,6+Math.round(pulse));R(mx-2,B-68,5,5,"#9fe7ff");R(mx-1,B-67,2,2,"#ffffff");
     if(!reduce&&Math.random()<.12)emit(mx+(Math.random()-.5)*6,B-66,(Math.random()-.5)*.2,(Math.random()-.5)*.2,60,"#9fe7ff")}
+  drawPlaces(t);
   if(has("keep"))drawKeep(cx,t);
   if(has("spire"))sunspire(cx);
   if(has("crystal"))crystal(cx,t);
@@ -1496,6 +1520,7 @@ function renderPlaces(balDollars){
   const box=$("places");box.innerHTML="";
   const alloc=allocate(balDollars);
   $("steward").textContent=stewardLine(balDollars,alloc);
+  scenePlaces=alloc.map(g=>({kind:g.kind,done:g.done,stage:g.pct===0?-1:(g.done?3:g.pct>=0.67?2:g.pct>=0.34?1:0)}));
   if(!alloc.length){box.innerHTML='<p class="empty">No places yet. Each one is a real goal, built stone by stone as you save.</p>';return}
   alloc.forEach(g=>{
     const stages=PLACE_STAGES[g.kind]||PLACE_STAGES.other;
